@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "psych-soma-codex"
+version = "0.1.0"
+description = "Constitutive, falsifiable transliteration of human neuroendocrine-affective dynamics for generative AI."
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.10"
+authors = [{ name = "Psych-Soma-Codex contributors" }]
+keywords = [
+  "affective-computing",
+  "computational-psychiatry",
+  "neuromodulation",
+  "interoception",
+  "llm",
+  "generative-ai",
+]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Science/Research",
+  "License :: OSI Approved :: Apache Software License",
+  "Programming Language :: Python :: 3",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=7.4"]
+
+[project.scripts]
+psc = "psych_soma_codex.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/ArabianLove/-S-Psych-Soma-Codex-S"
+
+[tool.setuptools.packages.find]
+include = ["psych_soma_codex*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+pythonpath = ["."]
