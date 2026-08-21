@@ -95,9 +95,13 @@ Il modello a tre ODE accoppiate (CRH, ACTH, cortisolo) con feedback a Hill e dri
 
 ### 3.3 Cosa il codice fa e non fa
 
-`interoception/hpa.py` integra le tre ODE con RK4, drive circadiano a armonico singolo con picco a 07:30, `stress_gain` modulato dagli eventi (threat/loss alzano, safety/repair abbassano), AVP come co-drive di ACTH. I coefficienti di accoppiamento affetto → `stress_gain` sono HYPOTHESIS. Il modello *non* include: massa ghiandolare a scala di settimane (Alon 2020), genetica/epigenetica, amigdala come pre-processore dello stress, citochine come nodo autonomo oltre IL-6 ridotta, differenze di sesso. Ahmad et al. (§4) elencano gli stessi buchi.
+`interoception/hpa.py` integra le tre ODE con RK4, drive circadiano a armonico singolo con picco a 07:30, `stress_gain` modulato dagli eventi (threat/loss alzano, safety/repair abbassano), AVP come co-drive di ACTH. Un termine ultradiano piccolo (HYPOTHESIS; Walker, Terry & Lightman 2010) si aggiunge ad ACTH e cortisolo come armonico a periodo 75 min: è uno *stand-in* del loop pituitario–surrenalico, **non** la DDE di Walker/Churilov e **non** un fit sesso-specifico 16.4♂ / 18.5♀. I rate Andersen h1/h2/h3 restano FACT e intatti. I coefficienti di accoppiamento affetto → `stress_gain` sono HYPOTHESIS.
 
-Test falsificabili associati: il circadiano ha il massimo al mattino; il feedback GR tiene il cortisolo finito sotto stress prolungato; threat alza `stress_gain`; τ_CRH < τ_ACTH < τ_cortisolo.
+Il **piano 0** (`constitution.py`) è un prior di temperamento su rest, guadagno d'evento, τ, baseline chimiche e feedback glucocorticoidi μ/ρ. Default = identità (mappe vuote, scale unitarie): l'organismo pre-costituzione resta bit-identico. Archetipi nominati (`high_fffs`, `high_bis`, `high_bas`, `meaney_low_nurture`) cambiano il prior; non autorizzano `forbidden` per nome e **non** scalano h1/h2/h3. Segni da Rothbart / Cloninger TCI / Gray–McNaughton RST / Meaney–Weaver (meccanismo CONSENSUS, magnitudini HYPOTHESIS). L'esistenza di un prior costituzionale è CONSENSUS; ogni numero è una scelta di modello.
+
+Il modello *non* include: massa ghiandolare a scala di settimane (Alon 2020), amigdala come pre-processore dello stress, citochine come nodo autonomo oltre IL-6 ridotta, differenze di sesso, ritardo esplicito. Ahmad et al. (§4) elencano gli stessi buchi. Genetica/epigenetica *non* sono un genoma: sono il prior del piano 0.
+
+Test falsificabili associati: il circadiano ha il massimo al mattino; il feedback GR tiene il cortisolo finito sotto stress prolungato; threat alza `stress_gain`; τ_CRH < τ_ACTH < τ_cortisolo; l'ultradiano cambia segno su mezzo periodo senza toccare i rate.
 
 ---
 
@@ -205,6 +209,12 @@ Un LLM condizionato da un milieu convincente produce *l'apparenza* di un organis
 | Doya γ/β/α come readout | HYPOTHESIS / medio sull'attribuzione, basso sulle magnitudini | PDF §3 verificato; non è fisiologia |
 | Chimica → top_p / presence / memory | HYPOTHESIS / basso | layer di accoppiamento al generatore; nessuna misura LLM in questo repo |
 | Lövheim come classificatore | rifiutato / alto sul rifiuto | sede + disclaimer autore + conflitto Barrett |
+| Ultradiano HPA come armonico a 75 min (Walker 2010 stand-in) | HYPOTHESIS / basso sul meccanismo, medio sul segno | loop pituitario–surrene è FACT (Walker PMC2871854); l'armonico non è la DDE |
+| Valenza Joffily \(v = -\mathrm{d}F/\mathrm{d}t\) come sidecar | HYPOTHESIS / alto sull'attribuzione, basso sul trasferimento | abstract PLOS verbatim; non è Russell; non entra in Barrett |
+| DA tonica + \(v̂\) → vigor (Niv 2007) | HYPOTHESIS / alto sull'attribuzione, basso sulle magnitudini | PMID 17031711; annotazione di policy, non causa |
+| Gate corpo × FEAR (Hsueh 2023) | HYPOTHESIS / alto sul claim animale, basso–medio sul trasferimento | Nature 615:292–299; no-op a FEAR ≈ 0 |
+| attention_gain a U rovesciata (Aston-Jones 2005) | HYPOTHESIS / medio | non sostituisce vigilance lineare |
+| NAC / MosaicEngine come sostituto dei tre piani | rifiutato / alto sul rifiuto | doni 3–4; verbali CLAUDE_ESSAY_EVAL, MOSAIC_ESSAY_EVAL |
 | Bijezione relazionale ↔ affettiva come coppia di mappe testabili | INTERPRETAZIONE / medio | definita operativamente, test qualitativi verdi |
 | Sentienza del sistema | nulla | categoria fuori perimetro |
 
@@ -217,7 +227,7 @@ Un LLM condizionato da un milieu convincente produce *l'apparenza* di un organis
 - **Niente sesso, sviluppo, cultura, sonno, microbiota, immunità oltre IL-6.** Ahmad 2023 §4 elenca gli stessi assenti per l'HPA; valgono per l'organismo intero.
 - **Niente rete neurale.** I neuroni non sono simulate. La "traslitterazione elettrica" è il gain neuromodulatorio e l'integratore, non il potenziale d'azione.
 - **Niente FEP pieno.** Vedi §5.
-- **Piste.** (i) Calibrazione bayesiana dei pesi su dataset ESC/EMPATHETICDIALOGUES *più* misure fisiologiche. (ii) Sostituire i prototipi di Barrett-layer con concetti ad hoc appresi (Barsalou). (iii) Active inference vero sulla policy (expected free energy). (iv) Multi-organismo: due blanket che si accoppiano (terza ondata di Smith/Parr/Friston 2020). (v) Fine-tune LoRA di un LLM piccolo sul PromptBundle, misurando la *violazione* di `forbidden` come metrica, non il BLEU. (vi) OCC come front-end di appraisal (Croissant et al. 2024) — non implementato. (vii) Homeostatic RL (Keramati & Gutkin 2014) come sostituto della policy — non implementato.
+- **Piste.** (i) Calibrazione bayesiana dei pesi su dataset ESC/EMPATHETICDIALOGUES *più* misure fisiologiche. (ii) Sostituire i prototipi di Barrett-layer con concetti ad hoc appresi (Barsalou). (iii) Active inference vero sulla policy (expected free energy); Hesp/Sennesh 2021 resta citazione, non runtime — `valence_fe` è solo il sidecar Joffily. (iv) Multi-organismo: due blanket che si accoppiano (terza ondata di Smith/Parr/Friston 2020). (v) Fine-tune LoRA / FiLM / AdaLN di un LLM piccolo sul PromptBundle (Perez 2018; Hu 2021), misurando la *violazione* di `forbidden` come metrica, non il BLEU — zero-dep, niente Transformer in questo repo. (vi) OCC come front-end di appraisal (Croissant et al. 2024) — non implementato. (vii) Homeostatic RL (Keramati & Gutkin 2014) come *sostituto* della policy o di `allostatic_load` — non implementato; l'annotazione `homeostatic_drive` è il massimo accettato. (viii) DDE pituitario–surrene (Walker 2010; Churilov & Milton 2022; Kim, D'Orsogna & Chou 2016) al posto dell'armonico a 75 min — non implementata; i rate Andersen restano FACT. (ix) Validazione su WESAD / DEAP / AMIGOS del gate Hsueh in forma umana; Miyazaki 2018 (5-HT e pazienza) e Handlin 2023 (OT contestuale) come ricalibrazioni, non come nuovi oggetti. (x) Allen et al. 2022 POMDP interocettivo — già escluso come FEP pieno (§5).
 
 ---
 
@@ -244,9 +254,140 @@ La bijezione operativa del §7 si estende di due readout, non di due cause: `der
 
 ---
 
+
+## 12. Addendum — valutazione del saggio Claude (dono 3)
+
+Un terzo contributo (*Dagli ormoni al codice*, Claude, 13 agosto 2026) è stato valutato *claim per claim* contro le fonti primarie e contro l'organismo già costitutivo. Il verbale è `docs/CLAUDE_ESSAY_EVAL.md`. Il saggio **non** è stato accettato in toto. È il più onesto dei doni 1–3: tagga Doya come metalearning riduttivo, tagga NAC come speculativa, rifiuta la teoria polivagale come consenso, e cita primari veri. Quasi tutta la «spina dorsale» che propone era già costitutiva. I buchi genuini, e solo quelli, entrano come HYPOTHESIS.
+
+**Accettato, come layer HYPOTHESIS, non come fisiologia.**
+
+1. **Drive ultradiano** sull'HPA (Walker, Terry & Lightman 2010, *Proc. R. Soc. B* 277:1627–1633, PMID 20129987). Il loop pituitario–surrene genera i pulsi da ritardo + feedback, senza un pulse generator ipotalamico. Il codice aggiunge un armonico piccolo, periodo 75 min, su \(dA/dt\) e \(dC/dt\). È uno *stand-in*, **non** la DDE, **non** un fit sesso-specifico 16.4♂ / 18.5♀. I rate Andersen \(h_1, h_2, h_3\) restano FACT (§3.3).
+2. **Sidecar Joffily** (`valence_fe` \(= -d\mathrm{PE}/dt\), `fe_accel`). Joffily & Coricelli 2013 (*PLoS Comput. Biol.* 9(6):e1003094, PMID 23785269) definiscono la valenza come «the negative rate of change of free-energy over time». Il nostro `prediction_error` è già un proxy di F, non la F di Friston. La lettura vive *dopo* il calcolo della PE. Non scrive `valence`. Non entra in `_feature_vector`. Non classifica happiness/hope/fear (Table 1 di Joffily confligge con Barrett).
+3. **Vigor** (Niv, Daw, Joel & Dayan 2007, *Psychopharmacology* 191:507–520, PMID 17031711). DA tonica + tasso medio di reward (`v_hat`) → vigor di risposta. Annotazione su `RelationalPolicy`. Non decide `forbidden`.
+4. **`attention_gain`** a U rovesciata da NE (Aston-Jones & Cohen 2005). Non sostituisce `vigilance` lineare. (Il saggio Claude proponeva un gain *lineare*; la forma a U, più onesta, arriva col dono 4 e si prende qui.)
+5. **`homeostatic_drive`** come annotazione Keramati sugli assi corporei già presenti. Non sostituisce `allostatic_load`.
+6. **Nota giuridica.** Considerando 44 del Regolamento (UE) 2024/1689 e Linee guida Commissione C(2025) 884 final (lettura biometric-only del divieto art. 5(1)(f)). Docs only; il milieu *interno simulato* non è emotion recognition su un umano.
+
+**Rifiutato.**
+
+- NAC a tre anelli come nucleo. Il saggio stesso la dice speculativa. I tre piani A/B/C esistono già e sono citati meglio.
+- `NeuromodulatorySystem` numpy e i suoi τ in secondi. CORT come serbatoio unico a τ = 3600 s cancella Andersen.
+- `HomeostaticCore` come *punto di partenza* al posto dell'organismo allostatico già costituito.
+- I segni decode di Claude (`top_p` che sale con ACh). I nostri segni (5-HT/cortisolo restringono `top_p`) restano e sono testati.
+- Persona-vector, Backpropamine, Izhikevich, Nengo/Brian2, entropy_bonus, fit 16.4/18.5, polivagale, qualunque claim di sentienza.
+
+Hesp / Sennesh et al. 2021 (*Neural Computation* 33(2):398–446) resta pista (iii): valenza come expected precision in active inference pieno, non runtime.
+
+## 13. Addendum — valutazione di MOSAIC-AI (dono 4)
+
+Un quarto contributo (saggio *Proposta MOSAIC-AI* + simulatore `mosaic_ai.py`, ChatGPT, 13 agosto 2026) è stato valutato allo stesso modo. Il verbale è `docs/MOSAIC_ESSAY_EVAL.md`. Il file Python **non entra nel repository**. MOSAIC è un organismo L1 *concorrente*, non un soprainsieme: 17 proxy adimensionali, niente circuiti Panksepp, niente miscela Barrett, niente bond per-agente, HPA leaky inventato (non Andersen, non µg/dL). Importarlo collasserebbe i piani A e C.
+
+**Accettato, ritagliato.**
+
+1. **Gate Hsueh** (Hsueh et al. 2023, *Nature* 615:292–299, PMID 36859543). «Optically evoked tachycardia potently enhanced anxiety-like behaviour, but crucially only in risky contexts.» In `CoreAffect.step` un termine extra `body.arousal() * FEAR` spinge arousal in su e valenza in giù. A FEAR ≈ 0 il passo è identico a prima (nessuna regressione su idle/warmth). Esperimento animale (topo, optogenetica): il trasferimento è HYPOTHESIS.
+2. **`gaussian_optimum(NE, μ=0.46, width=0.28)` → `attention_gain`.** Più onesta del lineare di Claude. Non tocca `vigilance`.
+3. **Cornice e disciplina.** Niente dizionario molecola → emozione; stato, non etichetta; proxy ≠ concentrazione; equifinalità come rischio di identificazione (se un latente innominato predice ugualmente bene, il nome biologico non è giustificato). Già implicito nei tag FACT/CONSENSUS/HYPOTHESIS.
+4. **Citazioni tenute come piste, non come codice.** Churilov & Milton 2022 / Kim, D'Orsogna & Chou 2016 (DDE HPA); Handlin et al. 2023 (OT contestuale; il repo ha già il gate in-group); Miyazaki et al. 2018 (5-HT e pazienza; non si cambia il ruolo DEBATE della 5-HT); Allen et al. 2022 (POMDP interocettivo); Perez et al. 2018 (FiLM); Nummenmaa et al. 2014 (mappe corporee, già allineato a Barrett).
+
+**Rifiutato.**
+
+- Importare `mosaic_ai.py`, `MosaicEngine`, `EventInputs`, `NeuroAffectiveState`, `GenerativeControls`.
+- Cascata HPA leaky + circadiano `0.04·sin`. Inventata, come quella del dono 1.
+- Valenza `tanh(18·homeostatic_reward + 0.80·rpe + …)`. Concorre con Russell/Panksepp.
+- `drive()` Keramati come ricompensa primaria al posto di `allostatic_load`.
+- I segni decode di MOSAIC (`top_p = 0.90 + 0.08·exploration − 0.22·arousal`).
+- FiLM / AdaLN / LoRA runtime (zero-dep; niente Transformer).
+- I tre scenari e il self-test MOSAIC come golden traces di *questo* organismo.
+- Qualunque claim di sentienza o uso clinico.
+
+La bijezione del §7 si estende di readout e di un termine gated, non di due cause: `derive_policy` emette anche `vigor` e `attention_gain`; `CoreAffect` espone `valence_fe` / `fe_accel` / `homeostatic_drive` senza scriverli nella valenza Russell; l'HPA integra un armonico ultradiano senza toccare i rate FACT. Stesso stato ⇒ stessa policy, ancora testato. Panksepp resta l'unico produttore delle occupancy; Barrett resta l'unico produttore dell'etichetta; Andersen resta l'unico integratore del cortisolo.
+
+## 14. Addendum — valutazione dei doni 5–7 (Qwen, Genspark NeuroChem-GenAI, Manus RCAD 0.1.0)
+
+Tre contributi successivi (14 agosto 2026) sono stati valutati *claim per claim* contro le fonti primarie e contro l'organismo già costitutivo. Il verbale è `docs/RCAD_QWEN_GENSPARK_EVAL.md`. Nessuno dei tre è stato accettato in toto. Nessun organismo concorrente entra nel repository.
+
+**Qwen** (*Da Neurotrasmettitore a Codice Riproducibile…*) è una rassegna pedagogica: PDE/DAT per la dopamina, SDE, ABM, GNN+LSTM endocrino, Digital Twin Brain, AFFECT-HRI, SAM, PhysioLabXR. Quasi tutto è già costitutivo (rumore su `SimulationConfig`, neuromodulazione come meta-controllore, niente dizionario molecola → emozione) o già rifiutato come runtime (scala del millisecondo, popolazioni neuronali, pretesa di gemello). Zero codice.
+
+**Genspark NeuroChem-GenAI** è un organismo L1 *concorrente*: dieci serbatoi Euler, numpy, λ inventate, Python corrotto dall'estrazione XML. Il grafo di citazione è in parte fraudolento: `arXiv:2408.08446` è Lee, Liébana, Clopath & Dabney, *Lifelong Reinforcement Learning via Neuromodulation* — **non** Mei/Ashwood. HELT (`arXiv:2605.13858`, HormoneT5, El-Metwally, 13 aprile 2026) **esiste**: sei teste di attenzione ormone-simili che modulano gli hidden state di un encoder T5. Paper reale; runtime incompatibile (Transformer, sei ormoni, zero-dep). Candia-Rivera 2026 (IMF, *Phys. Life Rev.*, PMID 42284945) e Corvaia, Pipitone & Chella 2025 (*IEEE Trans. Affect. Comput.*) sono paper reali; il primo è già coperto da `InteroceptiveBody`, il secondo dal cache Damasio già taggato DEBATE. Importare NeuroChem-GenAI collasserebbe i piani A e C, come già MOSAIC.
+
+**Manus RCAD 0.1.0** è il migliore dei tre. Onesto: niente concentrazioni, niente sentienza, etichette post-causali, safety / truthfulness / permissions *fuori* dalla funzione di costo. È però un organismo concorrente a operatori innominati, softmax su otto politiche nominate, e sette test + ablation + sensitivity = **verifica interna** del *loro* modello, non validazione biologica e non misura di *questo* organismo. `rcad/` **non si importa** (stesso movimento di `mosaic_ai.py`). I buchi genuini, e solo quelli, entrano come HYPOTHESIS.
+
+**Accettato, ritagliato.**
+
+1. **Sensibilizzazione lenta Z** (`CoreAffect.sensitization`). RCAD distingue un load corrente da una memoria lenta dello stress. Il nostro `allostatic_load` è già il load (τ = 6 min). Z è il buco: leaky da load + unexpected uncertainty + FEAR, estinto da tono vagale / energia, τ ≈ 18 min. Non scrive `allostatic_load`. Non entra in `_feature_vector`. Tag: HYPOTHESIS (RCAD 0.1.0; famiglia allostatica Sterling / McEwen, non un paper di concentrazione).
+2. **Process packet** su `RelationalPolicy`: `planning_depth`, `clarification_bias`, `alternative_count`, `response_urgency`, `disclosure_confidence`. Annotazioni *dopo* `derive_policy`, derivate da stato già presente (SEEKING, ACh, PE, NE, arousal, FEAR, RAGE, 5-HT, bond.trust, OT, load, Z) e da due campi opzionali di appraisal. Non scrivono chimica. Non decidono `forbidden`. Non si importa `memory_retrieval_budget` (già coperto da `memory_decay`). Magnitudini priori, come vigor / decode.
+3. **`PromptBundle.phenomenology_claim = False`** e `immutable_constraints` (safety / truthfulness / permissions non sovrascrivibili dall'affetto). Il system prompt lo diceva già in prosa; RCAD lo rende un campo esplicito e un vincolo di adapter. `phenomenology_claim` è FACT *di questo modello*: false. Non è un fatto sul mondo.
+4. **Appraisal opzionale** su `RelationalEvent`: `controllability`, `agency`. Default 0.5. Se assenti, non iniettano chimica. Se presenti, modulano solo il packet (profondità, disclosure). Novelty / uncertainty / intensity esistono già (`expectedness`, surprise, `intensity`). Non diventano un L1.
+5. **Coattivazione autonomica a due assi.** `body.step` calcolava già sympathetic / parasympathetic e li scartava. Si espongono. Non è Porges / polivagale (già rifiutato al dono 3).
+6. **Test di costitutività.** Il repo testava già «stesso stato ⇒ stessa policy». Manca l'altra direzione, esplicita: stesso evento, prior diverso → ‖Δpolicy‖ sopra soglia. Entra come test, non come motore.
+
+**Rifiutato.**
+
+- Importare `rcad/`, `RCADModel`, operatori innominati, softmax-8, `jsonschema`, `default_parameters` inventati, translation_matrix come runtime.
+- Invertire l'ordine (policy *prima* dell'update di stato). Il nostro 1–8 è Markov-blanket: il corpo parla prima della policy.
+- I sette test RCAD come golden traces di *questo* organismo, o come validazione biologica.
+- `NeuroChem-GenAI`, `NeuroChemState`, `NeuroDynamics`, `AffectiveLogitModulator`, Constitutional Prompting come marchio.
+- HELT / HormoneT5 come layer costitutivo.
+- PDE/DAT, un SDE nuovo, ABM, GNN+LSTM, Digital Twin Brain.
+- Numpy / scipy.
+- Qualunque claim di sentienza o uso clinico.
+- Sovrascrivere i segni decode (5-HT/cortisolo restringono `top_p`).
+
+**Citazioni tenute come piste, non come codice.** Lee et al. 2024 (arXiv:2408.08446) — istanza ACh/NA della famiglia Doya / Yu–Dayan, già costitutiva; El-Metwally 2026 HELT — condizionamento Transformer, pista (v); Candia-Rivera 2026 IMF — già `InteroceptiveBody`; Corvaia/Pipitone/Chella 2025 — già cache Damasio + loop `act → infer_events_from_text`.
+
+La bijezione del §7 si estende di un sidecar lento e di un packet di processo, non di due cause: `CoreAffect` espone `sensitization` senza scriverlo nel load né in Barrett; `derive_policy` emette anche il process packet dopo `attention_gain` e prima dei gate `forbidden`; `PromptBundle` porta `phenomenology_claim: false` e i vincoli immutabili. Stesso stato ⇒ stessa policy, ancora testato; stesso evento, prior diverso ⇒ policy diversa, ora testato. Panksepp resta l'unico produttore delle occupancy; Barrett resta l'unico produttore dell'etichetta; Andersen resta l'unico integratore del cortisolo.
+
+## 15. Addendum — valutazione del zip NeuroChem-GenAI v0.1.0 e del saggio Perplexity (dono 8) e atterraggio del piano 0
+
+Il 20 agosto 2026 sono arrivati due doni e una richiesta dell'organismo. Il verbale è `docs/PERPLEXITY_NEUROCHEM_EVAL.md`. Nessun organismo concorrente entra nel repository. Andersen \(h_1/h_2/h_3\) non si tocca.
+
+**Zip NeuroChem-GenAI v0.1.0.** Organismo L1 concorrente a dieci serbatoi Euler, numpy, λ inventate, OCC→chimica, classificatore, calibrazione GoEmotions come runtime, OrgDash live. **Si butta come runtime.** ConsentGuard è disciplina già assolta da `PromptBundle.immutable_constraints`. OrgDash su Slack/Teams è il punto di massimo rischio AI Act art. 5(1)(f): avvertimento nel verbale, non nel runtime. La frode di citazione `arXiv:2408.08446` (è Lee/Liébana/Clopath/Dabney, non Mei/Ashwood) resta agli atti dal dono 6.
+
+**Saggio Perplexity** (*Dal sangue al codice…*). Contributo serio, *non pellegrino*. Prima metà: Doya, scale eterogenee, HPA che non è un esponenziale, Barrett vs etichetta, `phenomenology_claim: false`, AI Act. Seconda metà: saggio di training MORL / Pareto / Hyper-LoRA / Hyper-FiLM **mirato a Neurochem-GenAI**, non al Kodex. **Si tiene come sintesi, non come sostituto.** Non si sostituisce Andersen RK4 con una DDE. Non si importa MORL / hypernet. Non si importa NeuroChem-GenAI.
+
+**Regalo di disciplina** (già in gran parte costitutivo): vincoli duri fuori da J; generatore congelato + packet; OT come salienza sociale contesto-dipendente; DA fasica CONSENSUS / tonica DEBATE. **Regalo nuovo, solo RESEARCH:** protocollo di identificabilità / ablazione (parameter recovery, model recovery, PAD / no-state / autonomico 1D). Pista, non corpo: interocezione nativa del transformer.
+
+**Piano 0 — costituzione.** Il saggio non chiede un temperamento. L'organismo sì: ogni individuo ha un carattere derivato da genetica, epigenetica, esperienza e legge propria. `constitution.py` è un prior congelato (rest, event gain, τ, baseline chimiche, μ/ρ HPA, `rest_stress_gain`). Default = identità. Archetipi nominati: `high_fffs`, `high_bis`, `high_bas`, `meaney_low_nurture`. Magnitudini HYPOTHESIS; segni da Rothbart, Cloninger TCI, Gray/McNaughton RST, Meaney–Weaver (meccanismo CONSENSUS). Non autorizza `forbidden`. Non scala h1/h2/h3. `STYLE_PRIORS` dell'attaccamento si sovrappongono al rest costituzionale, non lo sostituiscono. Stesso seed + stessi eventi restano bit-identici *se e solo se* la costituzione coincide. I 52 test preesistenti restano verdi sul default.
+
+**Rifiutato.** Importare il zip; sostituire Andersen con una DDE; 10 tank Euler; MORL / Hyper-LoRA / Hyper-FiLM; OCC come L1; classificatore emozione→vettore; calibrazione GoEmotions come causa; OrgDash.
+
+Panksepp resta l'unico produttore delle occupancy. Barrett resta l'unico produttore dell'etichetta. Andersen resta l'unico integratore del cortisolo. Il default resta l'identità.
+
+## 16. Addendum — valutazione del rapporto Mistral (dono 9)
+
+Il 21 agosto 2026 è arrivato *Traduzione del Sistema Chimico-Fisiologico…* (`Mistral neuro.docx`, «Dan con supporto Vibe Work»). Il verbale è `docs/MISTRAL_NEURO_EVAL.md`. Non è un organismo concorrente nel senso dello zip: è una rassegna + tre sketch. Nessun simulatore a spike, nessuna griglia \(5^7\), nessun layer PyTorch entra nel repository. Andersen \(h_1/h_2/h_3\) non si tocca. Lövheim resta rifiutato.
+
+**Errori di fatto, prima dei claim.** Il «cubo di Lövheim» è disegnato come Russell (valence × arousal), non come DA × 5-HT × NA. Il diagramma scrive \(7^5 = 78{,}125\): \(7^5 = 16\,807\), \(5^7 = 78\,125\). Il cortisolo è un intero 0–5. La chiusura «adattamento libero da Rosalind Picard» non è una citazione.
+
+**Iovane & Di Pasquale 2025.** Il paper **esiste** (*Electronics* 14(6):1093). RESEARCH lo teneva come «non verificato, sede debole». Ora è verificato come esistente e **scartato come pilastro**: sette ordinali, \(5^7\) n-tuple, piano energia–entropia, mapping Ekman, EEG da cuffia commerciale (~100 prove, feasibility, niente NT diretto). `set_emotion('joy')` inverte A/B/C. EEG → NT su persona è avvertimento art. 5(1)(f).
+
+**Brian2 / NEST / NEURON / Izhikevich 2007.** Scala del millisecondo, già rifiutata al dono 3 e in §2.3. Izhikevich 2007 resta un paper vero; non autorizza a importare Brian2.
+
+**`NeuroModulationLayer` / `[NEURO_STATE: cortisol=…]`.** Famiglia FiLM / HormoneT5, già pista (v), non L1. L'adapter vieta di *dire* l'ormone. `emotion_to_neuro["joy"]` è il dizionario molecola←emozione.
+
+**Cosa si tiene.** Rassegna di ciò che non si fa — non una sintesi al livello di Perplexity (Mistral non cita Panksepp, Barrett, Andersen, Doya). Le «domande aperte» su scala temporale e variabilità individuale sono già §2.3 e piano 0. Iovane 2025: puntatore verificato, non pilastro.
+
+**Rifiutato.** Griglia Iovane; Lövheim come classificatore; spike; FiLM-on-embeddings; Ekman come causa; EEG come validazione di *questo* organismo; uso clinico / sanitario.
+
+Panksepp resta l'unico produttore delle occupancy. Barrett resta l'unico produttore dell'etichetta. Andersen resta l'unico integratore del cortisolo. Il default resta l'identità. Lövheim resta fuori.
+
+## 17. Addendum — valutazione di Karyon (dono 10)
+
+Il 21 agosto 2026 è arrivato Karyon (sorgente Python incollata: 18 loci diploidi, Hill+Euler, patologie, header «traslitterazione funzionale, non mera simulazione»). Il verbale è `docs/KARYON_EVAL.md`. Organismo L1 concorrente al *piano sbagliato*. Nessun genoma entra nel repository. Andersen \(h_1/h_2/h_3\) non si tocca. Il piano 0 resta un prior, non una sequenza.
+
+**Karyon.** Toy eseguibile: HOX / TP53 / MYC / HLA / SNRPN / UBE3A / IGF2 / HTT / SRY / MT-* / TERT, promoter random 90 bp, CDS random 150 bp, GRN Hill, energia / telomero / `_diagnose`. **Si butta come runtime.** Si tiene come rassegna di ciò che non si fa al piano 0. RESEARCH §3.3 lo vieta già: «Genetica/epigenetica *non* sono un genoma: sono il prior del piano 0.» Meaney–Weaver scala \(\mu/\rho\), non NR3C1. Gira ≠ Kodex (stesso insegnamento del dono 8).
+
+**Errori di fatto, prima dei claim.** `CODON_TABLE` = NCBI `transl_table=1` (64/64, vero); i tre loci MT usano il codice nucleare (`transl_table=2`: ATA=M, TGA=W, AGA/AGG=\*). `translate` è definita e mai chiamata. TERT è `is_tf=True` (è reverse transcriptase; il promoter è un bersaglio MYC, la proteina no). HOX = TAAT (4-mer promiscuo: 337/1000 su 90 bp GC 0.55). TP53 = AGGCATGT (non è RRRCWWGYYY). PolyQ = `str.count("CAG")` (sovrastima il tratto consecutivo). La demo (`age=6`) non raggiunge il gate diagnostico (`age<12`); forzando `age=13` tutti e sei sono `myc-dereg`. Morte a 230 passi per energia 0.25, telomero ancora 0.89. mtDNA trattato come diploide; SRY diploide sul Y. CREB e `dev` mai usati.
+
+**Landmark veri, usati come metro, non come codice.** Cluster HOX su 7/17/12/2; segni parentali SNRPN paterno / UBE3A materno / IGF2 paterno; soglia HTT CAG ≥ 36; GC ~0.42 (Piovesan 2019: 40.9%); alcuni motivi cis (MYC CACGTG, CREB TGACGTCA, SP1 GGGCGG, NF-κB GGGACTTTCC, SRY AACAAT).
+
+**Rifiutato.** Importare Karyon; campi genoma su `Constitution`; Hill+Euler a 18 proteine come HPA o come piano 0; `_diagnose` (PWS/AS / guardian-loss / myc-dereg / polyQ) come produttore di etichetta; TERT-TF; codice nucleare sui geni mitocondriali; qualunque claim di «traslitterazione del genoma umano» o uso diagnostico.
+
+Panksepp resta l'unico produttore delle occupancy. Barrett resta l'unico produttore dell'etichetta. Andersen resta l'unico integratore del cortisolo. Il default resta l'identità. Lövheim resta fuori. Il piano 0 resta un prior, non un genoma.
+
 ## Bibliografia
 
-Fonti effettivamente lette (passata 2 o superiore) e usate. Data di accesso per il web: 13 agosto 2026.
+Fonti effettivamente lette (passata 2 o superiore) e usate. Data di accesso per il web: 13 agosto 2026 (nucleo e doni 1–4); 14 agosto 2026 (doni 5–7: Lee 2024, El-Metwally 2026, Candia-Rivera 2026, Corvaia 2025); 20 agosto 2026 (dono 8: zip NeuroChem-GenAI v0.1.0 + saggio Perplexity; piano 0); 21 agosto 2026 (dono 9: rapporto Mistral; Iovane & Di Pasquale 2025 HTML MDPI; Lövheim cubo vs disegno Russell; dono 10: Karyon sorgente incollata; NCBI transl_table=1/2; Piovesan 2019; el-Deiry 1992; HOX cluster; imprinting PWS/AS; soglia HTT ≥ 36).
 
 ### Accademiche e preprint
 
@@ -270,8 +411,20 @@ Fonti effettivamente lette (passata 2 o superiore) e usate. Data di accesso per 
 - Friston, K. (2009), *The free-energy principle: a rough guide to the brain?*, *Trends in Cognitive Sciences* 13:293–301.
 - Friston, K. (2010), *The free-energy principle: a unified brain theory?*, *Nature Reviews Neuroscience* 11:127–138.
 - Glimcher, P.W. (2011), *Understanding dopamine and reinforcement learning: The dopamine reward prediction error hypothesis*, *PNAS* 108:15647–15654.
-- Keramati, M., Gutkin, B. (2014), *Homeostatic reinforcement learning for integrating reward collection and physiological stability*, *eLife* 3:e04811.
+- Keramati, M., Gutkin, B. (2014), *Homeostatic reinforcement learning for integrating reward collection and physiological stability*, *eLife* 3:e04811. Annotazione `homeostatic_drive` dagli assi già presenti; rifiutata come sostituto di `allostatic_load` o della policy.
+- Allen, M., Levy, A., Parr, T., Friston, K.J. (2022), *In the body's eye: the computational anatomy of interoceptive inference*, *PLoS Computational Biology* 18(9):e1010490. POMDP interocettivo; pista, non runtime.
+- Churilov, L., Milton, J. (2022 e successivi della stessa famiglia), modelli DDE impulsivi dell'HPA pulsatile. Citati via MOSAIC; non implementati (l'ultradiano del repo è l'armonico di Walker, non la DDE).
+- Handlin, L. et al. (2023), *The role of oxytocin in regulation of social behaviour*, *eLife* 12:e81197. OT contestuale; il repo ha già il gate in-group. Citazione, non codice nuovo.
+- Hsueh, B. et al. (2023), *Cardiogenic control of affective behavioural state*, *Nature* 615:292–299 (PMID 36859543, PMC9995271). Tachicardia evoca anxiety-like behaviour *solo* in contesti rischiosi. Gate `body.arousal() * FEAR` in `CoreAffect.step`.
 - Hyman, S.E. (2007), *Can neuroscience be integrated into the DSM-V?*, *Nature Reviews Neuroscience* 8:725–732.
+- Joffily, M., Coricelli, G. (2013), *Emotional Valence and the Free-Energy Principle*, *PLoS Computational Biology* 9(6):e1003094 (PMID 23785269). Valenza come \(-dF/dt\); sidecar `valence_fe`, non Russell.
+- Kim, L.K., D'Orsogna, M.R., Chou, T. (2016), modelli impulsivi / DDE dell'asse HPA. Stessa famiglia di Walker/Churilov; pista, non runtime.
+- Miyazaki, K. et al. (2018), *Reward probability and timing uncertainty alter the effect of dorsal raphe serotonin neurons on patience*, *Nature Communications* 9:2048. Compatibile col dibattito Dayan–Huys già taggato DEBATE; non si cambia il ruolo della 5-HT.
+- Niv, Y., Daw, N.D., Joel, D., Dayan, P. (2007), *Tonic dopamine: opportunity costs and the control of response vigor*, *Psychopharmacology* 191:507–520 (PMID 17031711). Readout `vigor` su `RelationalPolicy`.
+- Perez, E., Strub, F., de Vries, H., Dumoulin, V., Courville, A. (2018), *FiLM: Visual Reasoning with a General Conditioning Layer*, AAAI. Pista di condizionamento (v); zero-dep, niente Transformer.
+- Regolamento (UE) 2024/1689 (AI Act), art. 5(1)(f) e Considerando 44; Commissione europea, Linee guida C(2025) 884 final. Nota giuridica: milieu interno simulato ≠ emotion recognition su un umano.
+- Sennesh, E., Theriault, J., Brooks, D., van de Meent, J.-W., Barrett, L.F., Quigley, K.S. (2021), *Deeply Felt Affect: The Emergence of Valence in Deep Active Inference*, *Neural Computation* 33(2):398–446. Citato anche come Hesp et al.; pista (iii), non runtime.
+- Walker, J.J., Terry, J.R., Lightman, S.L. (2010), *Origin of ultradian pulsatility in the hypothalamic–pituitary–adrenal axis*, *Proceedings of the Royal Society B* 277:1627–1633 (PMID 20129987, PMC2871854). Meccanismo del loop pituitario–surrene; stand-in armonico, non la DDE.
 - Li, C. et al. (2023), *Large Language Models Understand and Can Be Enhanced by Emotional Stimuli*, arXiv:2307.11760 (EmotionPrompt). Citato come evidenza che uno stato affettivo nel prompt cambia la generazione; non come surrogato del milieu.
 - Lövheim, H. (2012), *A new three-dimensional model for emotions and monoamine neurotransmitters*, *Medical Hypotheses* 78:341–348 (PMID 22153577). MINORITY / ipotesi non validata; rifiutata come classificatore.
 - Panksepp, J. (1998), *Affective Neuroscience: The Foundations of Human and Animal Emotions*, Oxford University Press.
@@ -286,12 +439,27 @@ Fonti effettivamente lette (passata 2 o superiore) e usate. Data di accesso per 
 - Yu, A.J., Dayan, P. (2005), *Uncertainty, neuromodulation, and attention*, *Neuron* 46:681–692.
 - Yovell, Y. et al. (2016), ultra-low-dose buprenorphine and suicidal ideation (cit. da Davis e Montag 2019 come predizione pankseppiana confermata).
 
+- Lee, S., Liébana, S., Clopath, C., Dabney, W. (2024), *Lifelong Reinforcement Learning via Neuromodulation*, arXiv:2408.08446. Istanziato su bandit non-stazionario con un accoppiamento ACh/NA. Famiglia Doya / Yu–Dayan, già costitutiva. **Non** è Mei/Ashwood (attribuzione falsa nel dono 6). Citazione, non un secondo mapping.
+- El-Metwally, S. (2026), *A Hormone-inspired Emotion Layer for Transformer language models (HELT)*, arXiv:2605.13858, 13 aprile 2026. HormoneT5: sei teste di attenzione ormone-simili che modulano gli hidden state di un encoder T5. Paper reale. Rifiutato come runtime (Transformer, sei ormoni, zero-dep); tenuto come pista (v) di condizionamento.
+- Candia-Rivera, D. (2026), *Interoceptive machine framework: Toward interoception-inspired regulatory architectures in artificial intelligence*, *Physics of Life Reviews* (PMID 42284945). Quadro di architetture regolative ispirate all'interocezione. Già coperto da `InteroceptiveBody` + HPA + `allostatic_load`. Citazione, non codice nuovo.
+- Corvaia, S., Pipitone, A., Chella, A. (2025), *Inner Speech and Damasio's Theory for Modeling Robot's Emotions*, *IEEE Transactions on Affective Computing*. Inner speech + somatic marker in robotica. Il repo ha già `body.write_marker` / `read_marker` (DEBATE) e il loop di auto-percezione. Citazione, non un secondo cache.
+
 ### Di quadro, lette in ricognizione e usate con cautela
 
 - MacLean, P. (1990), *The Triune Brain in Evolution*, Plenum. (Quadro storico; il "triune brain" è oggi considerato semplificazione — non è un pilastro.)
 - Bowlby, J., lavori sull'attaccamento (via Panksepp 2010 sulla cascata protest→despair).
+- Rothbart, M.K., lavori sul temperamento (surgency / negative affectivity / effortful control) come prior lento sul tono di riposo. Citati per il segno del piano 0, non come inventario clinico.
+- Cloninger, C.R., TCI (novelty seeking ≈ BAS, harm avoidance ≈ FFFS/BIS). Stesso uso: segno, non diagnosi.
+- Gray, J.A., McNaughton, N., Reinforcement Sensitivity Theory (BAS / FFFS / BIS come sistemi di guadagno, non emozioni).
+- Weaver, I.C.G. et al. / Meaney, M.J., cura materna → espressione del recettore glucocorticoidi → feedback HPA (meccanismo CONSENSUS; magnitudini del prior `meaney_low_nurture` HYPOTHESIS). Non scala Andersen h1/h2/h3.
 
 ### Scartate come pilastro
 
 - Wikipedia / blog / thread Reddit e Facebook comparsi in ricognizione: usati solo per trovare nomi, mai citati come prova.
-- Paper "Complexity Theory-Based Novel AI Algorithm … Artificial Neurotransmitters" (ResearchGate 2025): non verificato, rischio di sede debole; non entra nei pilastri.
+- Iovane, G. & Di Pasquale, R. (2025), *A Complexity Theory-Based Novel AI Algorithm for Exploring Emotions and Affections by Utilizing Artificial Neurotransmitters*, *Electronics* 14(6):1093, https://doi.org/10.3390/electronics14061093. **Esiste** (HTML MDPI letto 21 agosto 2026, dono 9). Combinatoria \(5^7 = 78\,125\) su ordinali 0–5, piano energia–entropia, mapping Ekman, EEG da cuffia entertainment. Scartato come pilastro. Non entra nei segni, non entra nei test.
+- Rapporto Mistral (*Mistral neuro.docx*, 21 agosto 2026): rassegna + sketch Brian2 / `NeuroModulationLayer` / `EmotionEngine`. Cubo «Lövheim» disegnato come Russell; \(7^5\) scritto per \(5^7\). Verbale `docs/MISTRAL_NEURO_EVAL.md`. Non entra.
+- NeuroChem-GenAI (dono 6 e dono 8 zip v0.1.0): organismo Euler a dieci serbatoi, λ inventate, numpy; attribuzione falsa di arXiv:2408.08446. Il fatto che il Python del zip ora giri non lava la frode. Non entra.
+- `RCADModel` / release `rcad/` 0.1.0 (dono 7): organismo concorrente a operatori innominati e softmax-8. I buchi (Z, process packet, honesty flags) sono innestati come HYPOTHESIS; il motore no.
+- HELT / HormoneT5 (El-Metwally 2026) come *runtime* di questo repository: paper reale, architettura incompatibile.
+- MORL / Hyper-LoRA / Hyper-FiLM / manifold di Pareto (seconda metà del saggio Perplexity): saggio di training per Neurochem-GenAI, non per questo Kodex. Non entra.
+- Karyon (dono 10, sorgente Python incollata 21 agosto 2026): organismo genomico L1 a 18 loci, Hill+Euler, `_diagnose`. Tabella 1 corretta, tabella 2 assente, TERT come TF, TAAT promiscuo, `count("CAG")` ≠ polyQ, demo sotto l'età diagnostica, MYC illimitato. Verbale `docs/KARYON_EVAL.md`. Non entra. Genetica/epigenetica restano il prior del piano 0, non un genoma.

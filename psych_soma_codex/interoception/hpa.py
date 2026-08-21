@@ -5,7 +5,8 @@ nonlinear ODEs, simplified for real-time affective coupling:
 
     dR/dt = (k1 + D*k2) * stress_gain * (1 - mu * hill(C, Rc, beta)) - h1 R
     dA/dt = (k4 R + k3 * avp_drive) * (1 - rho * hill(C, Rc, beta)) - h2 A
-    dC/dt = k5 A - h3 C
+            + ultradian_acth_amp * U
+    dC/dt = k5 A - h3 C + ultradian_cortisol_amp * U
 
 Parameters default to Andersen et al. 2013 Math Biosci 246:122-138 Table-class
 values as compiled by Ahmad, Jena, Priyadarshi 2023 arXiv:2311.04570 Table 2:
@@ -16,6 +17,14 @@ values as compiled by Ahmad, Jena, Priyadarshi 2023 arXiv:2311.04570 Table 2:
 
 Circadian drive D is a raised, phase-shifted sinusoid peaking ~07:30
 (cortisol awakening response; Ahmad et al. 2023 §1.1; Van Cauter lineage).
+
+Ultradian drive U (HYPOTHESIS) is a small harmonic stand-in for the
+pituitary–adrenal delay loop (Walker, Terry & Lightman 2010 Proc R Soc B
+277:1627–1633). Period ~75 min sits in the 60–90 min band (Windle 1998a
+interpulse ~47–55 min is the empirical centre; we take a round mid-band
+period, not a fitted DDE). This is NOT the Walker/Churilov delay-differential
+equation and NOT a sex-specific 16.4♂ / 18.5♀ deconvolution fit. Andersen
+removal rates are untouched.
 
 Units
 -----
@@ -28,7 +37,9 @@ Epistemic
 FACT: half-lives / removal rates (Andersen 2013).
 CONSENSUS: negative feedback of cortisol on CRH and ACTH.
 HYPOTHESIS: the precise coupling coefficients from affective circuits
-onto ``stress_gain`` (we expose them for falsification).
+on ``stress_gain`` (we expose them for falsification).
+HYPOTHESIS: small ultradian harmonic on ACTH/cortisol (Walker 2010
+mechanism as stand-in, not the DDE).
 """
 
 from __future__ import annotations
@@ -55,6 +66,12 @@ class HPAParams:
     beta: float = 3.0
     acth_scale: float = 20.0  # 1.0 internal ≈ 20 pg/mL
     cortisol_ref: float = 12.0  # µg/dL typical morning mid
+    # Ultradian harmonic (HYPOTHESIS). Period ~75 min sits in the 60–90 min
+    # band (Walker 2010; Windle 1998a interpulse ~47–55 min is the empirical
+    # centre; we take a round mid-band period, not a fitted DDE).
+    ultradian_period_min: float = 75.0
+    ultradian_acth_amp: float = 0.012
+    ultradian_cortisol_amp: float = 0.35  # µg/dL — small vs diurnal 5–25
 
 
 @dataclass
@@ -86,15 +103,31 @@ class HPAAxis:
         phase = 2.0 * math.pi * (tod_hours - 1.5) / 24.0
         return 0.55 + 0.45 * math.sin(phase)
 
+    def ultradian(self, tod_hours: float) -> float:
+        """Unit-amplitude sinusoid, period = ``ultradian_period_min``.
+
+        Walker 2010: pulses arise from pituitary–adrenal delay + feedback,
+        not a hypothalamic pulse generator. We do not integrate that DDE;
+        this harmonic is a declared stand-in (HYPOTHESIS).
+        """
+        p = self.params
+        assert p is not None
+        period_h = p.ultradian_period_min / 60.0
+        if period_h <= 1e-12:
+            return 0.0
+        return math.sin(2.0 * math.pi * tod_hours / period_h)
+
     def rhs(self, t: float, y: list[float], tod_hours: float) -> list[float]:
         p = self.params
         assert p is not None
         R, A, C = y
         D = self.circadian(tod_hours)
+        U = self.ultradian(tod_hours)
         fb_c = hill(max(C, 0.0), p.rc, p.beta)
         dR = (p.k1 + D * p.k2) * self.stress_gain * (1.0 - p.mu * fb_c) - p.h1 * R
         dA = (p.k4 * max(R, 0.0) + p.k3 * self.avp_drive) * (1.0 - p.rho * fb_c) - p.h2 * A
-        dC = p.k5 * max(A, 0.0) - p.h3 * C
+        dA = dA + p.ultradian_acth_amp * U
+        dC = p.k5 * max(A, 0.0) - p.h3 * C + p.ultradian_cortisol_amp * U
         return [dR, dA, dC]
 
     def step(self, dt: float, tod_hours: float) -> None:
@@ -134,4 +167,5 @@ class HPAAxis:
             "acth_pg_ml": self.acth_pg_ml,
             "cortisol_norm": self.cortisol_norm(),
             "circadian": self.circadian(0.0),  # placeholder; engine overwrites
+            "ultradian": 0.0,  # placeholder; engine overwrites
         }

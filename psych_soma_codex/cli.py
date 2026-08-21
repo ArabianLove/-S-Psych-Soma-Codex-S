@@ -16,6 +16,7 @@ import json
 import sys
 from pathlib import Path
 
+from psych_soma_codex.constitution import Constitution, NAMES as CONSTITUTION_NAMES
 from psych_soma_codex.engine import Organism, SimulationConfig, run
 from psych_soma_codex.io.events import EventKind, RelationalEvent
 from psych_soma_codex.llm.adapter import LLMAdapter
@@ -28,6 +29,7 @@ def _organism(args: argparse.Namespace) -> Organism:
         SimulationConfig(
             seed=int(getattr(args, "seed", 0)),
             attachment=style,
+            constitution=Constitution.named(getattr(args, "constitution", "default")),
             start_tod_hours=float(getattr(args, "tod", 8.0)),
             noise=float(getattr(args, "noise", 0.0)),
         )
@@ -108,6 +110,12 @@ def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="psc", description="Psych-Soma-Codex constitutive organism")
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--attachment", choices=[s.value for s in AttachmentStyle], default="secure")
+    p.add_argument(
+        "--constitution",
+        choices=list(CONSTITUTION_NAMES),
+        default="default",
+        help="plane-0 temperament prior (identity default)",
+    )
     p.add_argument("--tod", type=float, default=8.0, help="start time-of-day hours")
     p.add_argument("--noise", type=float, default=0.0)
     p.add_argument("--minutes", type=float, default=4.0, help="simulated minutes to integrate")

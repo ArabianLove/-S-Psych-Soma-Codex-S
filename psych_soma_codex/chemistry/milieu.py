@@ -23,18 +23,26 @@ class ChemicalMilieu:
     levels: dict[str, float] = field(default_factory=dict)
     drives: dict[str, float] = field(default_factory=dict)
     pulses: dict[str, float] = field(default_factory=dict)
+    baseline_offsets: dict[str, float] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         if not self.levels:
-            self.levels = {k: s.baseline for k, s in SPECIES.items()}
+            self.levels = {
+                k: clamp(s.baseline + self.baseline_offsets.get(k, 0.0), s.floor, s.ceiling)
+                for k, s in SPECIES.items()
+            }
         self.drives = {k: 0.0 for k in SPECIES}
         self.pulses = {k: 0.0 for k in SPECIES}
 
     def spec(self, key: str) -> SpeciesSpec:
         return SPECIES[key]
 
+    def baseline_of(self, key: str) -> float:
+        spec = SPECIES[key]
+        return spec.baseline + self.baseline_offsets.get(key, 0.0)
+
     def get(self, key: str) -> float:
-        return self.levels.get(key, SPECIES[key].baseline)
+        return self.levels.get(key, self.baseline_of(key) if key in SPECIES else 0.0)
 
     def inject(self, key: str, delta: float) -> None:
         if key not in SPECIES:
@@ -56,7 +64,7 @@ class ChemicalMilieu:
             y = self.levels[key]
             pulse = self.pulses.get(key, 0.0)
             drive = self.drives.get(key, 0.0) + pulse
-            target = spec.baseline + drive
+            target = spec.baseline + self.baseline_offsets.get(key, 0.0) + drive
             y = leaky_integrator(y, target, spec.tau_min, dt)
             if rng is not None and noise > 0.0:
                 y += rng.gauss(0.0, noise) * (dt ** 0.5)

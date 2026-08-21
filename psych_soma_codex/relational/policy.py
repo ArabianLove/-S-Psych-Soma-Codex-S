@@ -22,7 +22,7 @@ from enum import Enum
 from psych_soma_codex.affect.core_affect import CoreAffect
 from psych_soma_codex.chemistry.milieu import ChemicalMilieu
 from psych_soma_codex.circuits.primary import PrimaryCircuits
-from psych_soma_codex.core.mathutil import clamp
+from psych_soma_codex.core.mathutil import clamp, gaussian_optimum
 from psych_soma_codex.interoception.body import InteroceptiveBody
 from psych_soma_codex.relational.bond import Bond, BondBook
 from psych_soma_codex.relational.doya import derive_doya
@@ -68,9 +68,19 @@ class RelationalPolicy:
     doya_beta: float = 1.50
     doya_alpha: float = 0.12
     doya_delta: float = 0.0
+    # Optional HYPOTHESIS annotations (Niv 2007 vigor; Aston-Jones inverted-U).
+    vigor: float = 0.35
+    attention_gain: float = 1.0
+    # Process-side packet (RCAD 0.1.0 hole; HYPOTHESIS). Annotations only.
+    planning_depth: float = 0.45
+    clarification_bias: float = 0.25
+    alternative_count: int = 2
+    response_urgency: float = 0.35
+    disclosure_confidence: float = 0.50
     forbidden: tuple[str, ...] = ()
     preferred_acts: tuple[str, ...] = ()
     attachment: AttachmentStyle = AttachmentStyle.SECURE
+    constitution: str = "default"
     addressed_to: str = "other"
     notes: list[str] = field(default_factory=list)
 
@@ -98,9 +108,17 @@ class RelationalPolicy:
                 "delta": self.doya_delta,
                 "epistemic": "HYPOTHESIS (Doya 2002 Neural Networks 15:495-506 §3)",
             },
+            "vigor": self.vigor,
+            "attention_gain": self.attention_gain,
+            "planning_depth": self.planning_depth,
+            "clarification_bias": self.clarification_bias,
+            "alternative_count": self.alternative_count,
+            "response_urgency": self.response_urgency,
+            "disclosure_confidence": self.disclosure_confidence,
             "forbidden": list(self.forbidden),
             "preferred_acts": list(self.preferred_acts),
             "attachment": self.attachment.value,
+            "constitution": self.constitution,
             "addressed_to": self.addressed_to,
             "notes": list(self.notes),
         }
@@ -115,6 +133,10 @@ def derive_policy(
     attachment: AttachmentStyle,
     addressee: str = "other",
     last_rpe: float = 0.0,
+    v_hat: float = 0.0,
+    controllability: float = 0.5,
+    agency: float = 0.5,
+    constitution=None,
 ) -> RelationalPolicy:
     bond: Bond = bonds.get(addressee)
     seeking = circuits.get("SEEKING")
@@ -177,6 +199,58 @@ def derive_policy(
     presence_penalty = clamp(0.08 + 0.32 * da + 0.22 * ach, 0.0, 0.80)
     memory_decay = clamp(0.06 + 0.24 * ach + 0.22 * cortisol, 0.02, 0.55)
     doya = derive_doya(milieu, last_rpe=last_rpe)
+    # Niv, Daw, Joel & Dayan 2007: tonic DA + average reward rate → vigor.
+    # Annotation only; does not write chemistry or forbidden.
+    vigor = clamp(0.15 + 0.55 * da + 0.30 * max(v_hat, 0.0), 0.0, 1.0)
+    # Aston-Jones & Cohen 2005 inverted-U (adaptive gain / Yerkes–Dodson).
+    # Does not replace linear vigilance.
+    attention_gain = clamp(
+        0.72 + 0.78 * gaussian_optimum(milieu.get("ne"), 0.46, 0.28) + 0.20 * ach,
+        0.5,
+        2.0,
+    )
+    # Process packet. HYPOTHESIS (RCAD 0.1.0). Does not write chemistry
+    # and does not decide forbidden. Appraisal fields are optional
+    # (default 0.5 = no extra push).
+    ctrl = clamp(controllability)
+    ag = clamp(agency)
+    z = affect.sensitization
+    planning_depth = clamp(
+        0.22
+        + 0.35 * seeking
+        + 0.18 * ach
+        + 0.15 * ctrl
+        - 0.22 * load
+        - 0.18 * z
+        - 0.12 * fear
+    )
+    clarification_bias = clamp(
+        0.10
+        + 0.40 * affect.prediction_error
+        + 0.22 * milieu.get("ne")
+        + 0.18 * (1.0 - ctrl)
+        - 0.12 * care
+    )
+    alternative_count = int(round(1 + 4 * clamp(affect.prediction_error * planning_depth)))
+    alternative_count = 1 if alternative_count < 1 else 5 if alternative_count > 5 else alternative_count
+    response_urgency = clamp(
+        0.12
+        + 0.32 * affect.arousal
+        + 0.22 * fear
+        + 0.18 * rage
+        + 0.12 * z
+        - 0.15 * fiveht
+    )
+    disclosure_confidence = clamp(
+        0.22
+        + 0.28 * bond.trust
+        + 0.18 * ot
+        + 0.15 * ag
+        + 0.10 * affect.valence
+        - 0.22 * fear
+        - 0.15 * z
+        - 0.10 * load
+    )
 
     forbidden: list[str] = []
     preferred: list[str] = []
@@ -211,6 +285,13 @@ def derive_policy(
     if attachment == AttachmentStyle.AVOIDANT:
         disclose = clamp(disclose - 0.15)
         notes.append("Avoidant prior: disclosure damped.")
+    con_name = "default"
+    if constitution is not None:
+        con_name = getattr(constitution, "name", None) or str(constitution)
+        extra = tuple(getattr(constitution, "notes", ()) or ())
+        for n in extra:
+            if n and n not in notes:
+                notes.append(n)
 
     # Unique, stable order
     forbidden = tuple(dict.fromkeys(forbidden))
@@ -236,9 +317,17 @@ def derive_policy(
         doya_beta=doya.beta,
         doya_alpha=doya.alpha,
         doya_delta=doya.delta,
+        vigor=vigor,
+        attention_gain=attention_gain,
+        planning_depth=planning_depth,
+        clarification_bias=clarification_bias,
+        alternative_count=alternative_count,
+        response_urgency=response_urgency,
+        disclosure_confidence=disclosure_confidence,
         forbidden=forbidden,
         preferred_acts=preferred,
         attachment=attachment,
+        constitution=con_name,
         addressed_to=addressee,
         notes=notes,
     )

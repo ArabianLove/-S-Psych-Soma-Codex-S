@@ -46,14 +46,20 @@ REST: dict[str, float] = {
 class PrimaryCircuits:
     levels: dict[str, float] = field(default_factory=dict)
     pulses: dict[str, float] = field(default_factory=dict)
+    rest: dict[str, float] = field(default_factory=dict)
+    tau: dict[str, float] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
+        if not self.rest:
+            self.rest = dict(REST)
+        if not self.tau:
+            self.tau = dict(TAU)
         if not self.levels:
-            self.levels = dict(REST)
+            self.levels = dict(self.rest)
         self.pulses = {k: 0.0 for k in CIRCUITS}
 
     def get(self, key: str) -> float:
-        return self.levels.get(key, REST.get(key, 0.0))
+        return self.levels.get(key, self.rest.get(key, REST.get(key, 0.0)))
 
     def inject(self, key: str, delta: float) -> None:
         if key in CIRCUITS:
@@ -106,11 +112,13 @@ class PrimaryCircuits:
             if key == "FEAR":
                 extra += x.get("FEAR_brake", 0.0)
             pulse = self.pulses.get(key, 0.0)
-            target = REST[key] + chem[key] + extra + pulse
-            y = leaky_integrator(self.levels[key], target, TAU[key], dt)
+            rest = self.rest.get(key, REST[key])
+            tau = self.tau.get(key, TAU[key])
+            target = rest + chem[key] + extra + pulse
+            y = leaky_integrator(self.levels[key], target, tau, dt)
             self.levels[key] = clamp(y, 0.0, 1.0)
             # Envelope outlasts the event (Panksepp 2010 criterion 3).
-            self.pulses[key] = leaky_integrator(pulse, 0.0, TAU[key], dt)
+            self.pulses[key] = leaky_integrator(pulse, 0.0, tau, dt)
 
     def as_dict(self) -> dict[str, float]:
         return dict(self.levels)

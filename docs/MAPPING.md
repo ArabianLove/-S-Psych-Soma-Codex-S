@@ -52,6 +52,22 @@ are CONSENSUS unless marked otherwise.
 | safety / repair | opioid, CARE, OT | FEAR, GRIEF, RAGE |
 | sickness | IL-6, cortisol | SEEKING, PLAY |
 
+## Constitution (plane 0 prior)
+
+Frozen dataclass. Empty maps and unit scales are the identity. Magnitudes
+HYPOTHESIS; signs follow Rothbart / Cloninger TCI / Gray–McNaughton RST /
+Meaney–Weaver. Never authors `forbidden`. Never scales Andersen `h1/h2/h3`.
+
+| archetype | rest offsets | event gain | other | tag |
+|---|---|---|---|---|
+| `default` | — | — | identity | — |
+| `high_fffs` | FEAR +0.07, PLAY −0.02 | FEAR 1.40, CRH/NE/adrenaline up | FEAR τ × 1.30 | HYPOTHESIS |
+| `high_bis` | FEAR/GRIEF +0.04, SEEKING −0.02 | FEAR/GRIEF 1.15 | 5-HT baseline +0.05 | HYPOTHESIS |
+| `high_bas` | SEEKING +0.07, PLAY +0.03, FEAR −0.02 | DA 1.30, SEEKING 1.25 | DA baseline +0.05 | HYPOTHESIS |
+| `meaney_low_nurture` | FEAR +0.03 | — | μ × 0.70, ρ × 0.75, rest `stress_gain` 1.30 | CONSENSUS mechanism, HYPOTHESIS magnitudes |
+
+Attachment `STYLE_PRIORS` overlay constitutional rest, they do not replace it.
+
 ## Policy readout (inverse half)
 
 | high occupancy | policy |
@@ -90,4 +106,31 @@ Compatible with, not identical to, Yu & Dayan 2005 (already constitutive).
 | PLAY / SEEKING | raise sampling `temperature` |
 | FEAR / 5-HT / load | lower sampling `temperature` |
 
-Lövheim 2012 is **not** a mapping in this sheet.
+These decode **signs must not be overwritten**. Claude (gift 3) raises
+`top_p` with ACh; MOSAIC (gift 4) writes
+`top_p = 0.90 + 0.08·exploration − 0.22·arousal`. Neither map is adopted.
+
+### Sidecar annotations from gifts 3–4 (HYPOTHESIS)
+
+Readouts and one gated extra term. None of them write chemistry, none
+label an emotion, none decide `forbidden`. Verbals:
+`docs/CLAUDE_ESSAY_EVAL.md`, `docs/MOSAIC_ESSAY_EVAL.md`,
+`docs/RCAD_QWEN_GENSPARK_EVAL.md`.
+
+| object | lives in | source | what it is not |
+|---|---|---|---|
+| `hpa["ultradian"]` | additive harmonic on \(dA, dC\), period 75 min | Walker, Terry & Lightman 2010 | not the Walker/Churilov DDE; not a 16.4♂/18.5♀ fit; Andersen \(h_1/h_2/h_3\) untouched |
+| `valence_fe`, `fe_accel` | `CoreAffect` after PE update | Joffily & Coricelli 2013 | not Russell `valence`; not a Barrett feature |
+| `homeostatic_drive` | `CoreAffect` from energy / load / vagal | Keramati & Gutkin 2014 | not a replacement of `allostatic_load` |
+| `vigor` | `RelationalPolicy` from tonic DA + `v_hat` | Niv, Daw, Joel & Dayan 2007 | not a cause of `forbidden` |
+| `attention_gain` | `RelationalPolicy` via `gaussian_optimum(NE, 0.46, 0.28)` | Aston-Jones & Cohen 2005 | not a replacement of linear `vigilance` |
+| Hsueh extra term | `body.arousal() * FEAR` inside `CoreAffect.step` | Hsueh et al. 2023 *Nature* 615:292–299 | no-op at FEAR ≈ 0; not a new event field |
+| `sensitization` (Z) | `CoreAffect`, τ ≈ 18 min from load / PE / FEAR, brake from vagal / energy | RCAD 0.1.0 hole; allostatic family | not a replacement of `allostatic_load`; not a Barrett feature |
+| process packet | `planning_depth`, `clarification_bias`, `alternative_count`, `response_urgency`, `disclosure_confidence` on `RelationalPolicy` | RCAD 0.1.0 hole | not a cause of `forbidden`; not chemistry |
+| `phenomenology_claim` / `immutable_constraints` | `PromptBundle` | RCAD adapter honesty | always false / non-overridable; not a generator of affect |
+| `controllability`, `agency` | optional on `RelationalEvent` | RCAD appraisal hole | default 0.5; do not inject chemistry |
+| `body.sympathetic` / `parasympathetic` | already computed, now exposed | two-axis annotation | not Porges / polyvagal |
+| `Constitution` | rest / gain / τ / chem baselines / HPA μ/ρ | Rothbart; Cloninger; Gray RST; Meaney–Weaver | identity default; not a folk type; not Andersen h1/h2/h3 |
+
+Lövheim 2012 is **not** a mapping in this sheet. NAC, `MosaicEngine`,
+`RCADModel` and `NeuroChem-GenAI` are **not** mappings in this sheet.

@@ -2,6 +2,7 @@
 
 Order of a step (Markov-blanket consistent):
 
+0. Constitution  — prior on rest, event gain, τ, chemical baselines, HPA μ/ρ
 1. Sensory states  — ingest RelationalEvent(s)
 2. Chemical drive  — event weights + HPA/autonomic back-projections
 3. Circuits        — primary-process occupancies
@@ -14,11 +15,14 @@ Order of a step (Markov-blanket consistent):
 Nothing in this order is decorative. Swapping 3 and 4 would break the
 Panksepp criterion that chemical arousals *gate* the circuits; swapping
 6 and 7 would let a folk label drive policy before the body has spoken.
+The default constitution is the identity: empty maps and unit scales
+leave the organism bit-identical to the pre-constitution runtime.
+Andersen h1/h2/h3 are never scaled.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Iterable
 
 from psych_soma_codex.affect.constructor import construct_emotion
@@ -27,7 +31,8 @@ from psych_soma_codex.catalog.circuits import CIRCUITS
 from psych_soma_codex.catalog.events import EVENT_WEIGHTS
 from psych_soma_codex.catalog.species import SPECIES
 from psych_soma_codex.chemistry.milieu import ChemicalMilieu
-from psych_soma_codex.circuits.primary import REST, PrimaryCircuits
+from psych_soma_codex.circuits.primary import REST, TAU, PrimaryCircuits
+from psych_soma_codex.constitution import Constitution
 from psych_soma_codex.core.mathutil import clamp
 from psych_soma_codex.core.rng import Rng
 from psych_soma_codex.core.timebase import Timebase
@@ -50,6 +55,7 @@ class SimulationConfig:
     seed: int = 0
     noise: float = 0.0
     attachment: AttachmentStyle = AttachmentStyle.SECURE
+    constitution: Constitution = field(default_factory=Constitution)
     name: str = "organism"
     start_tod_hours: float = 8.0  # morning start, near CAR
     rpe_learning_rate: float = 0.12
@@ -80,16 +86,43 @@ class Organism:
     learning: LearningState = field(default_factory=LearningState)
     last_policy: RelationalPolicy | None = None
     last_emotion_label: str = "calm"
+    last_controllability: float = 0.5
+    last_agency: float = 0.5
     history: list[Snapshot] = field(default_factory=list, repr=False)
 
     def __post_init__(self) -> None:
         self.time = Timebase(dt_min=self.config.dt_min, t_min=self.config.start_tod_hours * 60.0)
         self.rng = Rng(self.config.seed)
-        # Attachment prior on resting circuit tones.
+        con = self.config.constitution
+        # Plane 0. Identity (empty maps, unit scales) is a no-op so the
+        # default organism stays bit-identical to the pre-constitution runtime.
+        if not con.is_identity():
+            rest = dict(REST)
+            for k, d in con.rest_offsets.items():
+                if k in rest:
+                    rest[k] = clamp(rest[k] + d)
+            self.circuits.rest = rest
+            self.circuits.tau = {k: con.tau_for(k, TAU[k]) for k in TAU}
+            self.circuits.levels = dict(self.circuits.rest)
+            if con.chem_baseline_offsets:
+                self.chemistry.baseline_offsets = dict(con.chem_baseline_offsets)
+                for k, off in con.chem_baseline_offsets.items():
+                    if k in self.chemistry.levels:
+                        spec = SPECIES[k]
+                        self.chemistry.levels[k] = clamp(spec.baseline + off, spec.floor, spec.ceiling)
+            p = self.hpa.params
+            if p is not None:
+                self.hpa.params = replace(
+                    p,
+                    mu=p.mu * con.hpa_mu_scale,
+                    rho=p.rho * con.hpa_rho_scale,
+                )
+            self.hpa.stress_gain = con.rest_stress_gain
+        # Attachment prior on resting circuit tones, over constitutional rest.
         priors = STYLE_PRIORS.get(self.config.attachment, {})
         for k, d in priors.items():
             if k in self.circuits.levels:
-                self.circuits.levels[k] = clamp(REST.get(k, 0.1) + d)
+                self.circuits.levels[k] = clamp(self.circuits.rest.get(k, REST.get(k, 0.1)) + d)
 
     # ------------------------------------------------------------------ ingest
     def ingest(self, events: Iterable[RelationalEvent | dict | str | EventKind]) -> list[RelationalEvent]:
@@ -101,9 +134,10 @@ class Organism:
     def _apply_event(self, ev: RelationalEvent) -> None:
         weights = EVENT_WEIGHTS.get(ev.kind.value, {})
         scale = ev.intensity
+        con = self.config.constitution
         # In-group gates OT-like effects (Carter / de Dreu context-dependence).
         for target, (delta, _tau) in weights.items():
-            d = delta * scale
+            d = delta * scale * con.gain(target)
             if target == "ot":
                 d *= 0.40 + 0.60 * ev.in_group
             if target in SPECIES:
@@ -146,6 +180,10 @@ class Organism:
         marker_key = f"{ev.kind.value}:{ev.agent}"
         self.body.write_marker(marker_key, ev.valence_hint * ev.intensity)
 
+        # Optional appraisal tags (do not inject chemistry).
+        self.last_controllability = ev.controllability
+        self.last_agency = ev.agency
+
         # Bond update.
         self.bonds.update_from_event(
             agent=ev.agent,
@@ -162,8 +200,8 @@ class Organism:
         if events:
             self.ingest(events)
 
-        # Slow leak of HPA stress gain back to 1.
-        self.hpa.stress_gain = 0.98 * self.hpa.stress_gain + 0.02 * 1.0
+        # Slow leak of HPA stress gain back to the constitutional rest.
+        self.hpa.stress_gain = 0.98 * self.hpa.stress_gain + 0.02 * self.config.constitution.rest_stress_gain
         self.hpa.avp_drive = 0.25 + 0.70 * self.chemistry.get("avp")
 
         # Circuit → chemistry back-projections (constitutive, not decorative).
@@ -206,12 +244,17 @@ class Organism:
             self.bonds,
             self.config.attachment,
             last_rpe=self.learning.last_rpe,
+            v_hat=self.learning.v_hat,
+            controllability=self.last_controllability,
+            agency=self.last_agency,
+            constitution=self.config.constitution,
         )
         self.last_policy = policy
         self.time = self.time.advanced(1)
 
         hpa_d = self.hpa.as_dict()
         hpa_d["circadian"] = self.hpa.circadian(self.time.tod_hours)
+        hpa_d["ultradian"] = self.hpa.ultradian(self.time.tod_hours)
         hpa_d["stress_gain"] = self.hpa.stress_gain
 
         snap = Snapshot(
@@ -237,6 +280,7 @@ class Organism:
                 "expected_uncertainty": self.learning.expected_uncertainty,
             },
             policy=policy.as_dict(),
+            constitution=self.config.constitution.name,
             epistemics={
                 "circuits": "CONSENSUS (Panksepp 2010)",
                 "rpe_da": "CONSENSUS (Schultz 1997; debate on tonic DA)",
@@ -248,6 +292,18 @@ class Organism:
                 "somatic_markers": "DEBATE (Damasio; Dunn 2006)",
                 "doya_metalearning": "HYPOTHESIS (Doya 2002 Neural Networks 15:495-506 §3)",
                 "decode_params": "HYPOTHESIS (chemistry→T/top_p/presence/memory; not physiology)",
+                "hpa_ultradian": "HYPOTHESIS (Walker 2010 harmonic stand-in; not the DDE)",
+                "joffily_valence_fe": "HYPOTHESIS (Joffily 2013 sidecar −dPE/dt; not Russell valence)",
+                "niv_vigor": "HYPOTHESIS (Niv 2007 tonic DA + v_hat; annotation)",
+                "hsueh_gate": "HYPOTHESIS (Hsueh 2023 body×FEAR extra term; no-op at FEAR≈0)",
+                "attention_gain": "HYPOTHESIS (Aston-Jones 2005 inverted-U; not vigilance)",
+                "sensitization": "HYPOTHESIS (RCAD 0.1.0 slow Z; not allostatic_load)",
+                "process_packet": "HYPOTHESIS (RCAD process knobs; do not decide forbidden)",
+                "constitution": (
+                    "HYPOTHESIS (Rothbart / Cloninger TCI / Gray-McNaughton RST / "
+                    "Meaney–Weaver; identity default; magnitudes not FACT)"
+                ),
+                "phenomenology_claim": "FACT of this model: false (not sentience)",
             },
         )
         return snap

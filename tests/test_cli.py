@@ -29,3 +29,12 @@ def test_cli_snapshot(capsys):
     payload = json.loads(capsys.readouterr().out)
     assert "valence" in payload
     assert "circuits" in payload
+
+
+
+def test_cli_constitution_high_fffs(capsys):
+    rc = main(["--minutes", "2", "--constitution", "high_fffs", "event", "threat", "--intensity", "0.8"])
+    assert rc == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["final"]["constitution"] == "high_fffs"
+    assert payload["final"]["circuits"]["FEAR"] >= payload["final"]["circuits"]["PLAY"]

@@ -16,6 +16,7 @@ fact. See ``docs/RESEARCH.md``.
 
 from __future__ import annotations
 
+from psych_soma_codex.constitution import Constitution
 from psych_soma_codex.engine import Organism, SimulationConfig, step, run
 from psych_soma_codex.io.events import RelationalEvent, EventKind
 from psych_soma_codex.io.snapshot import Snapshot
@@ -26,6 +27,7 @@ from psych_soma_codex.relational.policy import RelationalPolicy
 __all__ = [
     "Organism",
     "SimulationConfig",
+    "Constitution",
     "step",
     "run",
     "RelationalEvent",

@@ -76,6 +76,11 @@ class RelationalEvent:
     agent: str = "other"
     in_group: float = 0.7  # 1 = fully in-group (OT gain), 0 = out-group
     expectedness: float = 0.5  # 1 = fully predicted
+    # Optional appraisal tags (RCAD 0.1.0 hole; HYPOTHESIS). Defaults are
+    # neutral: they do not inject chemistry. If set, they only modulate
+    # the process packet in derive_policy.
+    controllability: float = 0.5
+    agency: float = 0.5
     text: str = ""
     tags: dict[str, Any] = field(default_factory=dict)
     t_min: float | None = None
@@ -87,6 +92,8 @@ class RelationalEvent:
         self.valence_hint = _clip(self.valence_hint, -1.0, 1.0)
         self.in_group = _clip(self.in_group, 0.0, 1.0)
         self.expectedness = _clip(self.expectedness, 0.0, 1.0)
+        self.controllability = _clip(self.controllability, 0.0, 1.0)
+        self.agency = _clip(self.agency, 0.0, 1.0)
         if self.valence_hint == 0.0:
             if self.kind in APPETITIVE:
                 self.valence_hint = 0.45
@@ -121,6 +128,8 @@ def parse_event(payload: dict[str, Any] | RelationalEvent | EventKind | str) -> 
         agent=str(payload.get("agent", "other")),
         in_group=float(payload.get("in_group", 0.7)),
         expectedness=float(payload.get("expectedness", 0.5)),
+        controllability=float(payload.get("controllability", 0.5)),
+        agency=float(payload.get("agency", 0.5)),
         text=str(payload.get("text", "")),
         tags=dict(payload.get("tags", {})),
         t_min=payload.get("t_min"),
