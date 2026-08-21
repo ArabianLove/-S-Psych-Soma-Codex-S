@@ -27,6 +27,8 @@ class InteroceptiveBody:
     muscle_tension: float = 0.18
     energy: float = 0.70
     inflammation: float = 0.08
+    sympathetic: float = 0.20
+    parasympathetic: float = 0.35
     # Somatic-marker cache: running association from situation hash → valence.
     # This is the Damasio as-if body loop, tagged DEBATE (see RESEARCH.md).
     markers: dict[str, float] | None = None
@@ -57,6 +59,9 @@ class InteroceptiveBody:
 
         sympathetic = 0.45 * adr + 0.25 * ne + 0.20 * fear + 0.18 * rage + 0.10 * cort
         parasymp = 0.40 * ot + 0.30 * opioid + 0.20 * care + 0.15 * play
+        # Two-axis coactivation annotation (RCAD hole). Not Porges.
+        self.sympathetic = clamp(sympathetic)
+        self.parasympathetic = clamp(parasymp)
 
         hr_target = 70.0 + 55.0 * sympathetic - 22.0 * parasymp + 8.0 * il6
         self.heart_rate_bpm = leaky_integrator(self.heart_rate_bpm, hr_target, 0.4, dt)
@@ -112,6 +117,8 @@ class InteroceptiveBody:
             "muscle_tension": self.muscle_tension,
             "energy": self.energy,
             "inflammation": self.inflammation,
+            "sympathetic": self.sympathetic,
+            "parasympathetic": self.parasympathetic,
             "arousal": self.arousal(),
             "valence_body": self.valence_body(),
         }

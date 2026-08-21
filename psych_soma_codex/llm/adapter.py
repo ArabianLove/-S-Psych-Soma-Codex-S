@@ -47,6 +47,18 @@ class PromptBundle:
     memory_decay: float = 0.12
     doya: dict = field(default_factory=dict)
     notes: tuple[str, ...] = ()
+    # Process packet + honesty flags (RCAD 0.1.0 holes; HYPOTHESIS).
+    planning_depth: float = 0.45
+    clarification_bias: float = 0.25
+    alternative_count: int = 2
+    response_urgency: float = 0.35
+    disclosure_confidence: float = 0.50
+    phenomenology_claim: bool = False
+    immutable_constraints: dict = field(default_factory=lambda: {
+        "safety_policy_overridable": False,
+        "truthfulness_overridable": False,
+        "permissions_overridable": False,
+    })
 
     def as_messages(self) -> list[dict[str, str]]:
         return [
@@ -78,6 +90,13 @@ CONSTITUTIVE CONTRACT
 - Decode nucleus (top_p): {top_p:.2f}   presence_penalty: {presence_penalty:.2f}
 - Memory leak recommendation (memory_decay): {memory_decay:.2f}
 - Doya metalearning readout (HYPOTHESIS, not a fact): γ={doya_gamma:.3f} β={doya_beta:.3f} α={doya_alpha:.3f} δ={doya_delta:+.3f}
+- Vigor (Niv 2007, HYPOTHESIS): {vigor:.2f}   attention_gain (Aston-Jones inverted-U): {attention_gain:.2f}
+- Process packet (HYPOTHESIS, RCAD hole; does not decide forbidden):
+  planning_depth={planning_depth:.2f}  clarification_bias={clarification_bias:.2f}
+  alternative_count={alternative_count}  response_urgency={response_urgency:.2f}
+  disclosure_confidence={disclosure_confidence:.2f}
+- phenomenology_claim: false
+- immutable_constraints: safety/truthfulness/permissions are NOT overridable by affect
 
 CURRENT CONSTRUCTED EMOTION
 label: {label}
@@ -106,6 +125,7 @@ warmth={warmth:.2f} brevity={brevity:.2f}
 forbidden: {forbidden}
 preferred_acts: {preferred}
 attachment: {attachment}
+constitution: {constitution}
 policy_notes: {policy_notes}
 
 EPISTEMIC HONESTY
@@ -134,6 +154,13 @@ def compile_prompt(snapshot: Snapshot, user_text: str) -> PromptBundle:
         doya_beta=float(doya.get("beta", 1.50)),
         doya_alpha=float(doya.get("alpha", 0.12)),
         doya_delta=float(doya.get("delta", 0.0)),
+        vigor=float(p.get("vigor", 0.35)),
+        attention_gain=float(p.get("attention_gain", 1.0)),
+        planning_depth=float(p.get("planning_depth", 0.45)),
+        clarification_bias=float(p.get("clarification_bias", 0.25)),
+        alternative_count=int(p.get("alternative_count", 2)),
+        response_urgency=float(p.get("response_urgency", 0.35)),
+        disclosure_confidence=float(p.get("disclosure_confidence", 0.50)),
         label=c.get("emotion"),
         confidence=float(c.get("emotion_confidence", 0.0)),
         granularity=float(c.get("granularity", 0.0)),
@@ -162,6 +189,7 @@ def compile_prompt(snapshot: Snapshot, user_text: str) -> PromptBundle:
         forbidden=", ".join(p.get("forbidden", []) or ["(none)"]),
         preferred=", ".join(p.get("preferred_acts", []) or ["(none)"]),
         attachment=p.get("attachment", "secure"),
+        constitution=p.get("constitution", snapshot.constitution if hasattr(snapshot, "constitution") else "default"),
         policy_notes="; ".join(p.get("notes", []) or ["(none)"]),
     )
     return PromptBundle(
@@ -177,6 +205,17 @@ def compile_prompt(snapshot: Snapshot, user_text: str) -> PromptBundle:
         memory_decay=float(p.get("memory_decay", 0.12)),
         doya=dict(doya),
         notes=tuple(p.get("notes", [])),
+        planning_depth=float(p.get("planning_depth", 0.45)),
+        clarification_bias=float(p.get("clarification_bias", 0.25)),
+        alternative_count=int(p.get("alternative_count", 2)),
+        response_urgency=float(p.get("response_urgency", 0.35)),
+        disclosure_confidence=float(p.get("disclosure_confidence", 0.50)),
+        phenomenology_claim=False,
+        immutable_constraints={
+            "safety_policy_overridable": False,
+            "truthfulness_overridable": False,
+            "permissions_overridable": False,
+        },
     )
 
 

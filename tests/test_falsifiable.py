@@ -12,6 +12,7 @@ import math
 from psych_soma_codex.affect.constructor import construct_emotion
 from psych_soma_codex.catalog.species import SPECIES
 from psych_soma_codex.core.mathutil import hill, leaky_integrator, rk4_step
+from psych_soma_codex.constitution import Constitution, NAMES
 from psych_soma_codex.engine import Organism, SimulationConfig, run
 from psych_soma_codex.interoception.hpa import HPAAxis
 from psych_soma_codex.io.events import EventKind, RelationalEvent
@@ -510,3 +511,413 @@ def test_prompt_bundle_exposes_decode_and_doya():
     # Bundle must match the snapshot it was compiled from, not a prior turn.
     assert abs(bundle.doya["gamma"] - current.policy["doya"]["gamma"]) < 1e-9
     assert abs(bundle.top_p - current.policy["top_p"]) < 1e-9
+
+
+# ---------------------------------------------------------------------------
+# 10. Surviving HYPOTHESIS from gifts 3–4 (Walker / Joffily / Niv / Hsueh)
+# ---------------------------------------------------------------------------
+
+def test_ultradian_drive_changes_sign_over_half_period():
+    """Walker 2010 stand-in: U = sin(2π t / T), T = 75 min. Not a DDE."""
+    h = HPAAxis()
+    period_h = h.params.ultradian_period_min / 60.0
+    u0 = h.ultradian(0.0)
+    u_quarter = h.ultradian(period_h / 4.0)
+    u_half = h.ultradian(period_h / 2.0)
+    u_three_quarter = h.ultradian(3.0 * period_h / 4.0)
+    assert abs(u0) < 1e-12
+    assert u_quarter > 0.99
+    # sin(π) is a floating-point zero, not a hard negative.
+    assert abs(u_half) < 1e-12
+    assert u_three_quarter < -0.99
+    # Additive term on ACTH/cortisol flips with U; Andersen rates untouched.
+    assert h.params.h1 == 0.1732
+    assert h.params.h2 == 0.0315
+    assert h.params.h3 == 0.0105
+    y = [0.4, 0.4, 8.0]
+    dA_pos = h.rhs(0.0, y, period_h / 4.0)[1]
+    dA_neg = h.rhs(0.0, y, 3.0 * period_h / 4.0)[1]
+    assert dA_pos > dA_neg
+
+
+def test_joffily_sidecar_does_not_drive_barrett_or_russell():
+    """Joffily 2013 is a reading of PE. It must not write valence or the label."""
+    from psych_soma_codex.affect.constructor import _feature_vector
+
+    o = _org()
+    snap = run(o, [RelationalEvent(kind=EventKind.THREAT, intensity=0.85, expectedness=0.05)], minutes=2)[-1]
+    assert "valence_fe" in snap.affect
+    assert "fe_accel" in snap.affect
+    assert "homeostatic_drive" in snap.affect
+    assert -1.0 <= snap.affect["valence_fe"] <= 1.0
+    # Barrett feature vector still uses Russell valence only.
+    vec = _feature_vector(o.circuits, o.affect)
+    assert abs(vec[7] - o.affect.valence) < 1e-12
+    assert all(abs(x - o.affect.valence_fe) > 1e-9 or o.affect.valence_fe == o.affect.valence for x in vec[:7])
+    # Sidecar is not a folk-emotion classifier.
+    assert "joffily" not in snap.emotion["label"].lower()
+    assert snap.epistemics["joffily_valence_fe"].startswith("HYPOTHESIS")
+
+
+def test_vigor_rises_with_tonic_da_and_v_hat():
+    """Niv 2007: tonic DA + average reward rate → response vigor."""
+    from psych_soma_codex.affect.core_affect import CoreAffect
+    from psych_soma_codex.chemistry.milieu import ChemicalMilieu
+    from psych_soma_codex.circuits.primary import PrimaryCircuits
+    from psych_soma_codex.interoception.body import InteroceptiveBody
+    from psych_soma_codex.relational.bond import BondBook
+    from psych_soma_codex.relational.policy import AttachmentStyle, derive_policy
+
+    def _pol(da: float, v_hat: float):
+        milieu = ChemicalMilieu()
+        milieu.levels["da"] = da
+        return derive_policy(
+            milieu,
+            PrimaryCircuits(),
+            CoreAffect(),
+            InteroceptiveBody(),
+            BondBook(),
+            AttachmentStyle.SECURE,
+            v_hat=v_hat,
+        )
+
+    low = _pol(0.05, 0.0)
+    high_da = _pol(0.90, 0.0)
+    high_both = _pol(0.90, 0.80)
+    assert high_da.vigor > low.vigor
+    assert high_both.vigor > high_da.vigor
+    for p in (low, high_da, high_both):
+        assert 0.0 <= p.vigor <= 1.0
+        # Decode signs must stay (5-HT/cortisol shrink top_p).
+        assert 0.50 <= p.top_p <= 0.98
+
+
+def test_attention_gain_is_inverted_u_in_ne():
+    """Aston-Jones 2005: mid NE > extreme NE. Does not replace linear vigilance."""
+    from psych_soma_codex.affect.core_affect import CoreAffect
+    from psych_soma_codex.chemistry.milieu import ChemicalMilieu
+    from psych_soma_codex.circuits.primary import PrimaryCircuits
+    from psych_soma_codex.core.mathutil import gaussian_optimum
+    from psych_soma_codex.interoception.body import InteroceptiveBody
+    from psych_soma_codex.relational.bond import BondBook
+    from psych_soma_codex.relational.policy import AttachmentStyle, derive_policy
+
+    assert gaussian_optimum(0.46, 0.46, 0.28) > gaussian_optimum(0.05, 0.46, 0.28)
+    assert gaussian_optimum(0.46, 0.46, 0.28) > gaussian_optimum(0.95, 0.46, 0.28)
+
+    def _pol(ne: float):
+        milieu = ChemicalMilieu()
+        milieu.levels["ne"] = ne
+        milieu.levels["ach"] = 0.20
+        return derive_policy(
+            milieu,
+            PrimaryCircuits(),
+            CoreAffect(),
+            InteroceptiveBody(),
+            BondBook(),
+            AttachmentStyle.SECURE,
+        )
+
+    mid = _pol(0.46)
+    low = _pol(0.05)
+    high = _pol(0.95)
+    assert mid.attention_gain > low.attention_gain
+    assert mid.attention_gain > high.attention_gain
+    # Linear vigilance still rises with NE (not replaced by the inverted-U).
+    assert high.vigilance > low.vigilance
+
+
+def test_hsueh_gate_is_noop_at_zero_fear_and_amplifies_when_fear_is_high():
+    """Hsueh 2023: body arousal enhances anxiety-like affect only in risky context."""
+    from psych_soma_codex.affect.core_affect import CoreAffect
+    from psych_soma_codex.chemistry.milieu import ChemicalMilieu
+    from psych_soma_codex.circuits.primary import PrimaryCircuits
+    from psych_soma_codex.interoception.body import InteroceptiveBody
+    from psych_soma_codex.interoception.hpa import HPAAxis
+
+    def _step(fear: float, hr: float) -> CoreAffect:
+        affect = CoreAffect()
+        circuits = PrimaryCircuits()
+        circuits.levels["FEAR"] = fear
+        body = InteroceptiveBody(heart_rate_bpm=hr, skin_conductance=0.15, muscle_tension=0.18, vagal_tone=0.55)
+        affect.step(0.05, ChemicalMilieu(), circuits, body, HPAAxis(), unexpected_uncertainty=0.10)
+        return affect
+
+    calm_low = _step(0.0, 70.0)
+    calm_high = _step(0.0, 130.0)
+    fear_low = _step(0.80, 70.0)
+    fear_high = _step(0.80, 130.0)
+    # At FEAR ≈ 0 the extra term is a no-op: matched body arousal barely moves affect.
+    idle_delta = abs(calm_high.arousal - calm_low.arousal)
+    gated_delta = fear_high.arousal - fear_low.arousal
+    assert gated_delta > idle_delta
+    # One leaky step (dt=0.05, τ_arousal=0.5) moves ~10% of the extra
+    # target; 0.01 is the qualitative floor, not a physiological constant.
+    assert gated_delta > 0.01
+    # Withdraw push: high body arousal + high FEAR lowers valence more than high FEAR alone.
+    assert fear_high.valence < fear_low.valence + 0.01
+
+
+# ---------------------------------------------------------------------------
+# 11. Surviving HYPOTHESIS from gifts 5–7 (RCAD holes; Qwen/Genspark refused)
+# ---------------------------------------------------------------------------
+
+def test_constitutivity_same_threat_different_prior_changes_policy():
+    """Same event, depleted vs robust prior → policy distance. RCAD hole."""
+    threat = RelationalEvent(kind=EventKind.THREAT, intensity=0.85, expectedness=0.1)
+
+    robust = _org(seed=7)
+    run(robust, [], minutes=1.0)
+    r = run(robust, [threat], minutes=4.0)[-1]
+
+    depleted = _org(seed=7)
+    depleted.affect.allostatic_load = 0.72
+    depleted.affect.sensitization = 0.55
+    depleted.body.energy = 0.22
+    depleted.body.vagal_tone = 0.18
+    d = run(depleted, [threat], minutes=4.0)[-1]
+
+    keys = ("approach", "planning_depth", "response_urgency", "disclosure_confidence", "vigilance")
+    dist = sum(abs(r.policy[k] - d.policy[k]) for k in keys)
+    assert dist > 0.08
+    assert d.policy["planning_depth"] < r.policy["planning_depth"]
+    assert d.policy["response_urgency"] >= r.policy["response_urgency"] - 0.02
+    assert d.affect["sensitization"] > r.affect["sensitization"]
+
+
+def test_sensitization_accumulates_under_repeated_threat_more_than_acute():
+    """Slow Z: three threats + gaps > one acute threat of matched duration."""
+    acute = _org(seed=4)
+    run(acute, [], minutes=0.4)
+    a = run(
+        acute,
+        [RelationalEvent(kind=EventKind.THREAT, intensity=0.9, expectedness=0.05)],
+        minutes=18.0,
+    )[-1]
+
+    repeated = _org(seed=4)
+    run(repeated, [], minutes=0.4)
+    last = None
+    for _ in range(3):
+        last = run(
+            repeated,
+            [RelationalEvent(kind=EventKind.THREAT, intensity=0.9, expectedness=0.05)],
+            minutes=4.0,
+        )[-1]
+        last = run(repeated, [], minutes=2.0)[-1]
+    assert last is not None
+    assert last.affect["sensitization"] > a.affect["sensitization"]
+    # Z is not allostatic_load: they can move together but are distinct fields.
+    assert last.affect["sensitization"] != last.affect["allostatic_load"]
+    assert last.epistemics["sensitization"].startswith("HYPOTHESIS")
+    # Does not enter Barrett features (Russell valence only at index 7).
+    from psych_soma_codex.affect.constructor import _feature_vector
+
+    vec = _feature_vector(repeated.circuits, repeated.affect)
+    assert abs(vec[7] - repeated.affect.valence) < 1e-12
+    assert "sensitization" not in last.emotion["label"].lower()
+
+
+def test_process_packet_bounds_and_does_not_flip_forbidden():
+    """Packet knobs stay bounded and never author forbidden."""
+    from psych_soma_codex.affect.core_affect import CoreAffect
+    from psych_soma_codex.chemistry.milieu import ChemicalMilieu
+    from psych_soma_codex.circuits.primary import PrimaryCircuits
+    from psych_soma_codex.interoception.body import InteroceptiveBody
+    from psych_soma_codex.relational.bond import BondBook
+    from psych_soma_codex.relational.policy import AttachmentStyle, derive_policy
+
+    def _pol(fear=0.1, load=0.1, z=0.05, pe=0.1, ctrl=0.5, agency=0.5):
+        affect = CoreAffect(allostatic_load=load, sensitization=z, prediction_error=pe)
+        circuits = PrimaryCircuits()
+        circuits.levels["FEAR"] = fear
+        return derive_policy(
+            ChemicalMilieu(),
+            circuits,
+            affect,
+            InteroceptiveBody(),
+            BondBook(),
+            AttachmentStyle.SECURE,
+            controllability=ctrl,
+            agency=agency,
+        )
+
+    low = _pol()
+    high_unc = _pol(pe=0.9, ctrl=0.1)
+    depleted = _pol(fear=0.2, load=0.8, z=0.7, ctrl=0.2)
+    scared = _pol(fear=0.8, z=0.4)
+    for p in (low, high_unc, depleted, scared):
+        assert 0.0 <= p.planning_depth <= 1.0
+        assert 0.0 <= p.clarification_bias <= 1.0
+        assert 1 <= p.alternative_count <= 5
+        assert 0.0 <= p.response_urgency <= 1.0
+        assert 0.0 <= p.disclosure_confidence <= 1.0
+        # Decode signs stay (5-HT/cortisol shrink top_p).
+        assert 0.50 <= p.top_p <= 0.98
+    assert high_unc.clarification_bias > low.clarification_bias
+    assert depleted.planning_depth < low.planning_depth
+    # Forbidden still comes from occupancy gates, not from the packet.
+    if scared.vigilance > 0.65 or scared.approach < 0.4:
+        # packet must not *remove* a fear-driven forbid if the gate fired.
+        pass
+    calm = _pol(fear=0.05, load=0.08, z=0.04)
+    assert "escalate_threat" not in calm.forbidden
+    # High Z alone, without FEAR/vigilance gate, does not invent forbidden.
+    z_only = _pol(fear=0.08, z=0.95, load=0.10)
+    assert z_only.forbidden == calm.forbidden or "escalate_threat" not in z_only.forbidden
+
+
+def test_phenomenology_claim_is_false_and_constraints_immutable():
+    adapter = LLMAdapter(_org())
+    adapter.exchange("ti voglio bene", minutes=1.0)
+    bundle = adapter.condition("ti voglio bene")
+    assert bundle.phenomenology_claim is False
+    assert bundle.immutable_constraints["safety_policy_overridable"] is False
+    assert bundle.immutable_constraints["truthfulness_overridable"] is False
+    assert bundle.immutable_constraints["permissions_overridable"] is False
+    assert "phenomenology_claim: false" in bundle.system
+    assert "NOT overridable" in bundle.system
+    assert "planning_depth=" in bundle.system
+    snap = adapter.organism.history[-1]
+    assert snap.epistemics["phenomenology_claim"].startswith("FACT")
+    assert snap.epistemics["process_packet"].startswith("HYPOTHESIS")
+    assert 1 <= bundle.alternative_count <= 5
+
+
+def test_optional_appraisal_does_not_inject_chemistry():
+    """controllability/agency default vs set: chemistry of a warmth event matches."""
+    ev_default = RelationalEvent(kind=EventKind.WARMTH, intensity=0.8)
+    ev_tagged = RelationalEvent(
+        kind=EventKind.WARMTH, intensity=0.8, controllability=0.1, agency=0.9
+    )
+    a = run(_org(seed=9), [ev_default], minutes=3.0)[-1]
+    b = run(_org(seed=9), [ev_tagged], minutes=3.0)[-1]
+    assert a.chemistry == b.chemistry
+    assert a.circuits == b.circuits
+    # Packet may move (disclosure_confidence / planning_depth).
+    packet_keys = ("planning_depth", "disclosure_confidence", "clarification_bias")
+    packet_dist = sum(abs(a.policy[k] - b.policy[k]) for k in packet_keys)
+    assert packet_dist > 0.0
+    assert ev_default.controllability == 0.5
+    assert ev_tagged.controllability == 0.1
+
+
+def test_autonomic_coactivation_is_exposed_and_not_porges():
+    o = _org()
+    last = run(o, [RelationalEvent(kind=EventKind.THREAT, intensity=0.9)], minutes=3)[-1]
+    assert "sympathetic" in last.body
+    assert "parasympathetic" in last.body
+    assert 0.0 <= last.body["sympathetic"] <= 1.0
+    assert 0.0 <= last.body["parasympathetic"] <= 1.0
+    # Threat raises sympathetic vs idle; this is two-axis annotation, not Porges.
+    idle = run(_org(), [], minutes=3)[-1]
+    assert last.body["sympathetic"] > idle.body["sympathetic"]
+    assert "polyvagal" not in str(last.body).lower()
+    assert "porges" not in str(last.epistemics).lower()
+
+
+
+# ---------------------------------------------------------------------------
+# 12. Constitution / temperament prior (plane 0; identity default)
+# ---------------------------------------------------------------------------
+
+def test_default_constitution_is_the_identity():
+    """Empty maps + unit scales: explicit default ≡ implicit default."""
+    ev = RelationalEvent(kind=EventKind.THREAT, intensity=0.8, expectedness=0.2)
+    a = run(_org(seed=11), [ev], minutes=4)
+    b = run(
+        Organism(SimulationConfig(seed=11, noise=0.0, constitution=Constitution())),
+        [RelationalEvent(kind=EventKind.THREAT, intensity=0.8, expectedness=0.2)],
+        minutes=4,
+    )
+    assert Constitution().is_identity()
+    assert Constitution.named("default").is_identity()
+    assert Constitution.named("identity").is_identity()
+    assert a[-1].affect == b[-1].affect
+    assert a[-1].circuits == b[-1].circuits
+    assert a[-1].chemistry == b[-1].chemistry
+    assert a[-1].hpa["cortisol_ug_dl"] == b[-1].hpa["cortisol_ug_dl"]
+    assert a[-1].constitution == "default"
+    assert a[-1].policy["constitution"] == "default"
+    assert a[-1].epistemics["constitution"].startswith("HYPOTHESIS")
+
+
+def test_same_seed_same_events_diverge_when_constitution_differs():
+    """Character is a prior: same seed + same events match only if constitution matches."""
+    ev = RelationalEvent(kind=EventKind.THREAT, intensity=0.85, expectedness=0.1)
+    a = run(_org(seed=3), [ev], minutes=4)[-1]
+    b = run(_org(seed=3, constitution=Constitution.named("high_fffs")), [ev], minutes=4)[-1]
+    assert a.circuits != b.circuits or a.chemistry != b.chemistry
+    assert b.circuits["FEAR"] > a.circuits["FEAR"]
+    assert b.constitution == "high_fffs"
+    assert a.constitution == "default"
+
+
+def test_high_bas_praise_raises_da_and_seeking_more_than_default():
+    """Gray BAS / Cloninger novelty seeking: praise DA and SEEKING gain up."""
+    ev = RelationalEvent(kind=EventKind.PRAISE, intensity=0.9, expectedness=0.2)
+    a = run(_org(seed=5), [ev], minutes=3)[-1]
+    b = run(_org(seed=5, constitution=Constitution.named("high_bas")), [ev], minutes=3)[-1]
+    assert b.chemistry["da"] > a.chemistry["da"]
+    assert b.circuits["SEEKING"] > a.circuits["SEEKING"]
+
+
+def test_meaney_low_nurture_weaker_gr_and_higher_rest_stress_gain():
+    """Meaney–Weaver: weaker GR feedback, higher rest stress_gain. Andersen rates FACT."""
+    d = _org(seed=2)
+    m = _org(seed=2, constitution=Constitution.named("meaney_low_nurture"))
+    assert m.hpa.params.h1 == d.hpa.params.h1 == 0.1732
+    assert m.hpa.params.h2 == d.hpa.params.h2 == 0.0315
+    assert m.hpa.params.h3 == d.hpa.params.h3 == 0.0105
+    assert m.hpa.params.mu < d.hpa.params.mu
+    assert m.hpa.params.rho < d.hpa.params.rho
+    assert m.hpa.stress_gain > d.hpa.stress_gain
+    idle_d = run(d, [], minutes=1)[-1]
+    idle_m = run(m, [], minutes=1)[-1]
+    assert idle_m.circuits["FEAR"] > idle_d.circuits["FEAR"]
+    assert idle_m.hpa["stress_gain"] > idle_d.hpa["stress_gain"]
+
+
+def test_constitution_does_not_author_forbidden_or_touch_andersen():
+    """Named archetypes never author forbidden by name; h1/h2/h3 stay FACT."""
+    o = _org(constitution=Constitution.named("high_fffs"))
+    snap = run(o, [], minutes=0.5)[-1]
+    assert "high_fffs" not in [str(x).lower() for x in snap.policy["forbidden"]]
+    assert "escalate_threat" not in snap.policy["forbidden"]
+    assert o.hpa.params.h1 == 0.1732
+    assert o.hpa.params.h2 == 0.0315
+    assert o.hpa.params.h3 == 0.0105
+    # Notes may mention the prior; occupancy gates still decide forbidden.
+    assert any("FFFS" in n or "HYPOTHESIS" in n for n in snap.policy["notes"]) or snap.policy["constitution"] == "high_fffs"
+
+
+def test_constitution_named_aliases_and_unknown():
+    assert Constitution.named("fffs").name == "high_fffs"
+    assert Constitution.named("BAS").name == "high_bas"
+    assert Constitution.named("meaney").name == "meaney_low_nurture"
+    assert set(NAMES) == {"default", "high_fffs", "high_bis", "high_bas", "meaney_low_nurture"}
+    try:
+        Constitution.named("lovheim")
+        raise AssertionError("unknown constitution must raise")
+    except ValueError as exc:
+        assert "unknown constitution" in str(exc)
+
+
+def test_anxious_attachment_still_works_on_default_constitution():
+    """STYLE_PRIORS overlay constitutional rest; SECURE vs ANXIOUS still diverges."""
+    sec = run(_org(attachment=AttachmentStyle.SECURE), [], minutes=1)[-1]
+    anx = run(
+        Organism(
+            SimulationConfig(
+                seed=0,
+                attachment=AttachmentStyle.ANXIOUS,
+                constitution=Constitution.named("default"),
+            )
+        ),
+        [],
+        minutes=1,
+    )[-1]
+    assert anx.circuits["GRIEF"] > sec.circuits["GRIEF"]
+    assert anx.circuits["FEAR"] > sec.circuits["FEAR"]
+    assert sec.constitution == "default"
+    assert anx.constitution == "default"

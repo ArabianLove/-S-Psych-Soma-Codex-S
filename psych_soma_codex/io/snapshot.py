@@ -22,6 +22,7 @@ class Snapshot:
     emotion: dict[str, Any]
     relational: dict[str, Any]
     policy: dict[str, Any]
+    constitution: str = "default"
     epistemics: dict[str, str] = field(default_factory=dict)
     notes: tuple[str, ...] = ()
 
@@ -46,10 +47,12 @@ class Snapshot:
             "dominance": round(self.affect["dominance"], 3),
             "allostatic_load": round(self.affect["allostatic_load"], 3),
             "prediction_error": round(self.affect["prediction_error"], 3),
+            "sensitization": round(self.affect.get("sensitization", 0.0), 3),
             "circuits": {k: round(v, 3) for k, v in top_circ},
             "chemistry": {k: round(v, 3) for k, v in top_chem},
             "hr_bpm": round(self.body["heart_rate_bpm"], 1),
             "vagal_tone": round(self.body["vagal_tone"], 3),
             "cortisol_ug_dl": round(self.hpa["cortisol_ug_dl"], 2),
+            "constitution": self.constitution,
             "policy": {k: (round(v, 3) if isinstance(v, float) else v) for k, v in self.policy.items()},
         }

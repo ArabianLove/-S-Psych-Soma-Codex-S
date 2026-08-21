@@ -19,6 +19,18 @@ def clamp(x: float, lo: float = 0.0, hi: float = 1.0) -> float:
     return float(x)
 
 
+def gaussian_optimum(x: float, mu: float, width: float) -> float:
+    """Unit-height Gaussian bump. HYPOTHESIS helper for inverted-U gain.
+
+    Aston-Jones & Cohen 2005 (adaptive gain / Yerkes–Dodson). Width is the
+    standard-deviation-like scale; returns 1 at ``x == mu`` and decays to 0.
+    """
+    if width <= 1e-12:
+        return 1.0 if abs(x - mu) < 1e-12 else 0.0
+    z = (x - mu) / width
+    return __import__("math").exp(-(z * z))
+
+
 def saturate(x: float) -> float:
     """Logistic squash centred at 0.5 with unit slope near the origin of (x-0.5)."""
     # Numerically stable logistic: 1 / (1 + exp(-k*(x-0.5)))
