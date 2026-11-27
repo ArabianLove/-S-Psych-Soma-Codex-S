@@ -18,6 +18,8 @@ Architecture: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 Mapping sheet: [`docs/MAPPING.md`](docs/MAPPING.md).
 Evaluation of two donated essays (accept / reject): [`docs/ESSAY_EVAL.md`](docs/ESSAY_EVAL.md).
 
+Coding agent for this checkout: [`CurCode/`](CurCode/) (Agent SDK).
+
 ---
 
 ## Why this exists
