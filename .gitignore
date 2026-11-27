@@ -11,3 +11,12 @@ build/
 htmlcov/
 *.log
 .DS_Store
+
+# CurCode (Agent SDK)
+CurCode/node_modules/
+CurCode/.agent-serve/
+CurCode/.env
+CurCode/.env.local
+CurCode/memory/
+# Session journal when CurCode uses the repo root as workspace
+/memory/
