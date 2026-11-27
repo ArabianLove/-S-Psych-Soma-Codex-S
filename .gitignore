@@ -18,3 +18,5 @@ CurCode/.agent-serve/
 CurCode/.env
 CurCode/.env.local
 CurCode/memory/
+# Session journal when CurCode uses the repo root as workspace
+/memory/
